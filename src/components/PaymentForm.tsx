@@ -75,7 +75,7 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
     if (!selectedTenant) return;
 
     try {
-      // Get outstanding balance from database function
+      // Calculate outstanding balance based on checkin date and current period
       const { data, error } = await supabase
         .rpc('calculate_outstanding_balance', {
           tenant_id: selectedTenant.id
@@ -213,12 +213,27 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
 
           {selectedTenant && (
             <>
+              {/* Tenant Info Display */}
+              <div className="bg-muted/50 p-4 rounded-lg border">
+                <h3 className="font-semibold mb-2">Informasi Penghuni</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Tanggal Masuk:</span>
+                    <p className="font-medium">{new Date(selectedTenant.checkin_date).toLocaleDateString('id-ID')}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Sewa Bulanan:</span>
+                    <p className="font-medium">Rp {selectedTenant.monthly_rent.toLocaleString('id-ID')}</p>
+                  </div>
+                </div>
+              </div>
+
               {/* Period Information */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="month" className="flex items-center gap-2">
                     <CalendarDays className="h-4 w-4" />
-                    Bulan
+                    Bulan Pembayaran
                   </Label>
                   <Select onValueChange={(value) => handleInputChange("month", value)} required>
                     <SelectTrigger className="border-primary/20 focus:border-primary">
@@ -249,7 +264,7 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
               {/* Payment Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="rentAmount">Tarif Sewa (Rp)</Label>
+                  <Label htmlFor="rentAmount">Tarif Sewa Bulan Ini (Rp)</Label>
                   <Input
                     id="rentAmount"
                     type="number"
@@ -268,6 +283,9 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
                     className="border-primary/20 focus:border-primary bg-muted"
                     readOnly
                   />
+                  <p className="text-xs text-muted-foreground">
+                    *Dihitung otomatis dari tanggal masuk penghuni
+                  </p>
                 </div>
               </div>
 
@@ -316,26 +334,63 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold flex items-center gap-2">
                         <Calculator className="h-5 w-5" />
-                        Perhitungan Otomatis
+                        Perhitungan Pembayaran
                       </h3>
                       <Badge variant={paymentStatus.color as any}>
                         {paymentStatus.status}
                       </Badge>
                     </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Total Tagihan:</span>
-                        <span className="font-medium">Rp {calculationResult.totalDue.toLocaleString("id-ID")}</span>
+                    <div className="space-y-3 text-sm">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span>Sewa Bulan Ini:</span>
+                            <span className="font-medium">Rp {formData.rentAmount.toLocaleString("id-ID")}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Tunggakan:</span>
+                            <span className="font-medium text-warning">Rp {formData.previousBalance.toLocaleString("id-ID")}</span>
+                          </div>
+                          <div className="flex justify-between border-t pt-1">
+                            <span className="font-semibold">Total Tagihan:</span>
+                            <span className="font-semibold">Rp {calculationResult.totalDue.toLocaleString("id-ID")}</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span>Diskon:</span>
+                            <span className="font-medium text-success">-Rp {formData.discountAmount.toLocaleString("id-ID")}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Setelah Diskon:</span>
+                            <span className="font-medium">Rp {calculationResult.totalAfterDiscount.toLocaleString("id-ID")}</span>
+                          </div>
+                          <div className="flex justify-between border-t pt-1">
+                            <span className="font-semibold">Dibayar:</span>
+                            <span className="font-semibold text-primary">Rp {formData.paymentAmount.toLocaleString("id-ID")}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Setelah Diskon:</span>
-                        <span className="font-medium">Rp {calculationResult.totalAfterDiscount.toLocaleString("id-ID")}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Sisa/Kelebihan:</span>
-                        <span className={`font-medium ${calculationResult.remainingBalance > 0 ? 'text-warning' : calculationResult.remainingBalance < 0 ? 'text-success' : 'text-foreground'}`}>
-                          Rp {Math.abs(calculationResult.remainingBalance).toLocaleString("id-ID")}
-                        </span>
+                      
+                      <div className="border-t pt-3">
+                        <div className="flex justify-between items-center">
+                          <span className="font-semibold">
+                            {calculationResult.remainingBalance > 0 ? 'Sisa Tagihan:' : 
+                             calculationResult.remainingBalance < 0 ? 'Kelebihan Bayar:' : 'Status:'}
+                          </span>
+                          <span className={`font-bold text-lg ${
+                            calculationResult.remainingBalance > 0 ? 'text-warning' : 
+                            calculationResult.remainingBalance < 0 ? 'text-success' : 'text-primary'
+                          }`}>
+                            {calculationResult.remainingBalance === 0 ? 'LUNAS' : 
+                             `Rp ${Math.abs(calculationResult.remainingBalance).toLocaleString("id-ID")}`}
+                          </span>
+                        </div>
+                        {calculationResult.remainingBalance > 0 && (
+                          <p className="text-xs text-warning mt-1">
+                            *Sisa tagihan akan otomatis terakumulasi ke bulan berikutnya
+                          </p>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -344,7 +399,7 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
 
               <Button type="submit" className="w-full" size="lg">
                 <Receipt className="h-4 w-4 mr-2" />
-                Buat Kwitansi
+                Buat Kwitansi Pembayaran
               </Button>
             </>
           )}

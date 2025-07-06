@@ -1,3 +1,4 @@
+
 import { PaymentFormData } from "./supabaseTypes";
 
 export interface PaymentResult {

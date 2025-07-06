@@ -136,71 +136,111 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
             {/* Right Column */}
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-muted-foreground">Periode</p>
+                <p className="text-sm text-muted-foreground">Periode Pembayaran</p>
                 <p className="font-semibold text-lg">{paymentData.month} {paymentData.year}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Metode Pembayaran</p>
                 <p className="font-semibold capitalize">{paymentData.paymentMethod === 'cash' ? 'Tunai' : paymentData.paymentMethod === 'transfer' ? 'Transfer Bank' : 'E-Wallet'}</p>
               </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Status Pembayaran</p>
+                <p className={`font-semibold ${
+                  paymentResult.paymentStatus === 'lunas' ? 'text-success' :
+                  paymentResult.paymentStatus === 'kurang_bayar' ? 'text-warning' : 'text-accent'
+                }`}>
+                  {paymentResult.paymentStatus === 'lunas' ? 'LUNAS' :
+                   paymentResult.paymentStatus === 'kurang_bayar' ? 'KURANG BAYAR' : 'LEBIH BAYAR'}
+                </p>
+              </div>
             </div>
           </div>
 
           <Separator className="my-6 bg-receipt-border" />
 
-          {/* Payment Breakdown */}
-          <div className="space-y-4 mb-8">
-            <h3 className="text-xl font-bold text-receipt-header">RINCIAN PEMBAYARAN</h3>
+          {/* Detailed Payment Breakdown */}
+          <div className="space-y-6 mb-8">
+            <h3 className="text-xl font-bold text-receipt-header">RINCIAN PEMBAYARAN LENGKAP</h3>
             
-            <div className="bg-muted/30 p-4 rounded-lg border border-receipt-border">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span>Tarif Sewa Bulan {paymentData.month} {paymentData.year}</span>
-                  <span className="font-semibold">{formatCurrency(paymentData.rentAmount)}</span>
+            {/* Main Calculation Table */}
+            <div className="bg-muted/30 p-6 rounded-lg border border-receipt-border">
+              <div className="space-y-4">
+                {/* Current Month Rent */}
+                <div className="flex justify-between items-center py-2 border-b border-muted">
+                  <div>
+                    <span className="font-medium">Tarif Sewa Bulan {paymentData.month} {paymentData.year}</span>
+                    <p className="text-sm text-muted-foreground">Sewa bulanan standar</p>
+                  </div>
+                  <span className="font-semibold text-lg">{formatCurrency(paymentData.rentAmount)}</span>
                 </div>
                 
+                {/* Outstanding Balance */}
                 {paymentData.previousBalance > 0 && (
-                  <div className="flex justify-between items-center text-warning">
-                    <span>Tunggakan Bulan Sebelumnya</span>
-                    <span className="font-semibold">{formatCurrency(paymentData.previousBalance)}</span>
+                  <div className="flex justify-between items-center py-2 border-b border-muted">
+                    <div>
+                      <span className="font-medium text-warning">Tunggakan Bulan Sebelumnya</span>
+                      <p className="text-sm text-muted-foreground">Akumulasi dari tanggal masuk penghuni</p>
+                    </div>
+                    <span className="font-semibold text-lg text-warning">{formatCurrency(paymentData.previousBalance)}</span>
                   </div>
                 )}
                 
-                <Separator className="bg-receipt-border" />
-                
-                <div className="flex justify-between items-center font-semibold text-lg">
-                  <span>Total Tagihan</span>
-                  <span>{formatCurrency(paymentResult.totalDue)}</span>
+                {/* Subtotal */}
+                <div className="flex justify-between items-center py-2 bg-muted/50 px-4 rounded">
+                  <span className="font-bold text-lg">TOTAL TAGIHAN</span>
+                  <span className="font-bold text-xl">{formatCurrency(paymentResult.totalDue)}</span>
                 </div>
                 
+                {/* Discount */}
                 {paymentData.discountAmount > 0 && (
                   <>
-                    <div className="flex justify-between items-center text-success">
-                      <span>Diskon</span>
-                      <span className="font-semibold">-{formatCurrency(paymentData.discountAmount)}</span>
+                    <div className="flex justify-between items-center py-2">
+                      <div>
+                        <span className="font-medium text-success">Diskon Pembayaran</span>
+                        <p className="text-sm text-muted-foreground">Potongan harga khusus</p>
+                      </div>
+                      <span className="font-semibold text-lg text-success">-{formatCurrency(paymentData.discountAmount)}</span>
                     </div>
-                    <div className="flex justify-between items-center font-semibold">
-                      <span>Total Setelah Diskon</span>
-                      <span>{formatCurrency(paymentResult.totalAfterDiscount)}</span>
+                    <div className="flex justify-between items-center py-2 bg-muted/50 px-4 rounded">
+                      <span className="font-bold">TOTAL SETELAH DISKON</span>
+                      <span className="font-bold text-lg">{formatCurrency(paymentResult.totalAfterDiscount)}</span>
                     </div>
                   </>
                 )}
                 
-                <Separator className="bg-receipt-border" />
+                <Separator className="bg-receipt-border my-4" />
                 
-                <div className="flex justify-between items-center text-lg font-bold text-primary">
-                  <span>Jumlah Dibayar</span>
-                  <span>{formatCurrency(paymentData.paymentAmount)}</span>
+                {/* Payment Amount */}
+                <div className="flex justify-between items-center py-3 bg-primary/10 px-4 rounded-lg">
+                  <div>
+                    <span className="font-bold text-lg text-primary">Jumlah Yang Dibayar</span>
+                    <p className="text-sm text-muted-foreground">Pembayaran hari ini</p>
+                  </div>
+                  <span className="font-bold text-2xl text-primary">{formatCurrency(paymentData.paymentAmount)}</span>
                 </div>
                 
+                {/* Remaining Balance or Overpayment */}
                 {paymentResult.remainingBalance !== 0 && (
-                  <div className={`flex justify-between items-center font-semibold ${
-                    paymentResult.remainingBalance > 0 ? 'text-warning' : 'text-success'
+                  <div className={`flex justify-between items-center py-3 px-4 rounded-lg ${
+                    paymentResult.remainingBalance > 0 ? 'bg-warning/10' : 'bg-success/10'
                   }`}>
-                    <span>
-                      {paymentResult.remainingBalance > 0 ? 'Sisa Tagihan' : 'Kelebihan Bayar'}
+                    <div>
+                      <span className={`font-bold text-lg ${
+                        paymentResult.remainingBalance > 0 ? 'text-warning' : 'text-success'
+                      }`}>
+                        {paymentResult.remainingBalance > 0 ? 'SISA TAGIHAN' : 'KELEBIHAN PEMBAYARAN'}
+                      </span>
+                      <p className="text-sm text-muted-foreground">
+                        {paymentResult.remainingBalance > 0 
+                          ? 'Akan terakumulasi ke bulan berikutnya' 
+                          : 'Akan dipotong dari tagihan bulan depan'}
+                      </p>
+                    </div>
+                    <span className={`font-bold text-2xl ${
+                      paymentResult.remainingBalance > 0 ? 'text-warning' : 'text-success'
+                    }`}>
+                      {formatCurrency(Math.abs(paymentResult.remainingBalance))}
                     </span>
-                    <span>{formatCurrency(Math.abs(paymentResult.remainingBalance))}</span>
                   </div>
                 )}
               </div>
@@ -209,25 +249,51 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
 
           {/* Amount in Words */}
           <div className="mb-8">
-            <p className="text-sm text-muted-foreground mb-2">Terbilang:</p>
-            <p className="text-lg font-semibold italic border border-receipt-border rounded-lg p-3 bg-muted/20 capitalize">
-              {numberToWords(paymentData.paymentAmount)}
-            </p>
+            <p className="text-sm text-muted-foreground mb-2">Terbilang (Jumlah Dibayar):</p>
+            <div className="border border-receipt-border rounded-lg p-4 bg-muted/20">
+              <p className="text-lg font-semibold italic capitalize">
+                {numberToWords(paymentData.paymentAmount)}
+              </p>
+            </div>
           </div>
 
           <Separator className="my-6 bg-receipt-border" />
 
+          {/* Summary Box */}
+          {paymentResult.remainingBalance !== 0 && (
+            <div className={`mb-6 p-4 rounded-lg border-2 ${
+              paymentResult.remainingBalance > 0 ? 'border-warning bg-warning/5' : 'border-success bg-success/5'
+            }`}>
+              <h4 className="font-bold mb-2">PENTING - INFORMASI PEMBAYARAN:</h4>
+              {paymentResult.remainingBalance > 0 ? (
+                <div className="space-y-1 text-sm">
+                  <p>• Status: <strong className="text-warning">KURANG BAYAR</strong></p>
+                  <p>• Sisa tagihan sebesar <strong>{formatCurrency(paymentResult.remainingBalance)}</strong></p>
+                  <p>• Sisa ini akan <strong>otomatis terakumulasi</strong> ke tagihan bulan berikutnya</p>
+                  <p>• Harap dilunasi pada pembayaran periode selanjutnya</p>
+                </div>
+              ) : (
+                <div className="space-y-1 text-sm">
+                  <p>• Status: <strong className="text-success">LEBIH BAYAR</strong></p>
+                  <p>• Kelebihan sebesar <strong>{formatCurrency(Math.abs(paymentResult.remainingBalance))}</strong></p>
+                  <p>• Kelebihan akan <strong>otomatis dipotong</strong> dari tagihan bulan depan</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Footer */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Catatan:</p>
+              <p className="text-sm text-muted-foreground font-semibold">Catatan Penting:</p>
               <ul className="text-sm space-y-1 text-muted-foreground">
-                <li>• Kwitansi ini sah dan resmi</li>
-                <li>• Simpan kwitansi sebagai bukti pembayaran</li>
-                <li>• Pembayaran selanjutnya tanggal 1-5 setiap bulan</li>
+                <li>• Kwitansi ini sah dan resmi sebagai bukti pembayaran</li>
+                <li>• Simpan kwitansi dengan baik untuk referensi</li>
+                <li>• Pembayaran bulan berikutnya: tanggal 1-5 setiap bulan</li>
+                <li>• Tunggakan dihitung otomatis dari tanggal masuk penghuni</li>
                 {paymentResult.remainingBalance > 0 && (
                   <li className="text-warning font-medium">
-                    • Harap lunasi sisa tagihan: {formatCurrency(paymentResult.remainingBalance)}
+                    • <strong>Wajib lunasi sisa tagihan: {formatCurrency(paymentResult.remainingBalance)}</strong>
                   </li>
                 )}
               </ul>
@@ -249,10 +315,10 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
           {/* Bottom Footer */}
           <div className="mt-8 pt-4 border-t border-receipt-border text-center">
             <p className="text-xs text-muted-foreground">
-              ANTIEQ WISMA KOST - Kost Nyaman, Aman, dan Terpercaya
+              ANTIEQ WISMA KOST - Sistem Pembayaran Terintegrasi dengan Perhitungan Tunggakan Otomatis
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Terima kasih atas kepercayaan Anda
+              Terima kasih atas kepercayaan dan kerjasama Anda
             </p>
           </div>
         </CardContent>
