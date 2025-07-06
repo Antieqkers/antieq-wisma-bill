@@ -1,12 +1,13 @@
 
 import { useState } from "react";
-import { Building2, Users, CreditCard, FileText, Receipt } from "lucide-react";
+import { Building2, Users, CreditCard, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PaymentForm from "@/components/PaymentForm";
 import Receipt from "@/components/Receipt";
 import TenantManagement from "@/components/TenantManagement";
 import MonthlyReport from "@/components/MonthlyReport";
-import { PaymentFormData, PaymentResult } from "@/lib/supabaseTypes";
+import { PaymentFormData } from "@/lib/supabaseTypes";
+import { PaymentResult } from "@/lib/paymentCalculator";
 
 type ViewType = "form" | "receipt" | "tenants" | "reports";
 
