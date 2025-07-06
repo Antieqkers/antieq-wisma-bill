@@ -9,16 +9,162 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      payments: {
+        Row: {
+          created_at: string | null
+          discount_amount: number | null
+          id: string
+          notes: string | null
+          payment_amount: number
+          payment_date: string
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          period_month: number
+          period_year: number
+          previous_balance: number | null
+          receipt_number: string
+          remaining_balance: number
+          rent_amount: number
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          discount_amount?: number | null
+          id?: string
+          notes?: string | null
+          payment_amount: number
+          payment_date?: string
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          period_month: number
+          period_year: number
+          previous_balance?: number | null
+          receipt_number: string
+          remaining_balance: number
+          rent_amount: number
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          discount_amount?: number | null
+          id?: string
+          notes?: string | null
+          payment_amount?: number
+          payment_date?: string
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          period_month?: number
+          period_year?: number
+          previous_balance?: number | null
+          receipt_number?: string
+          remaining_balance?: number
+          rent_amount?: number
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_balances: {
+        Row: {
+          created_at: string | null
+          current_balance: number | null
+          id: string
+          last_payment_date: string | null
+          next_due_date: string | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_balance?: number | null
+          id?: string
+          last_payment_date?: string | null
+          next_due_date?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_balance?: number | null
+          id?: string
+          last_payment_date?: string | null
+          next_due_date?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_balances_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          checkin_date: string
+          created_at: string | null
+          email: string | null
+          id: string
+          monthly_rent: number
+          name: string
+          phone: string | null
+          room_number: string
+          updated_at: string | null
+        }
+        Insert: {
+          checkin_date: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          monthly_rent?: number
+          name: string
+          phone?: string | null
+          room_number: string
+          updated_at?: string | null
+        }
+        Update: {
+          checkin_date?: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          monthly_rent?: number
+          name?: string
+          phone?: string | null
+          room_number?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      calculate_outstanding_balance: {
+        Args: { tenant_id: string; target_date?: string }
+        Returns: number
+      }
+      update_tenant_balance: {
+        Args: { tenant_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
-      [_ in never]: never
+      payment_method: "cash" | "transfer" | "ewallet"
+      payment_status: "lunas" | "kurang_bayar" | "lebih_bayar"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +279,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      payment_method: ["cash", "transfer", "ewallet"],
+      payment_status: ["lunas", "kurang_bayar", "lebih_bayar"],
+    },
   },
 } as const

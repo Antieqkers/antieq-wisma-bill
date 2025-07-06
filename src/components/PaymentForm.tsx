@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,14 +7,23 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, User, CreditCard, Receipt, Calculator } from "lucide-react";
-import { calculatePayment, PaymentData, PaymentResult } from "@/lib/paymentCalculator";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Tenant, PaymentFormData } from "@/lib/supabaseTypes";
+import { calculatePayment, PaymentResult } from "@/lib/paymentCalculator";
 
 interface PaymentFormProps {
-  onPaymentSubmit: (paymentData: PaymentData, result: PaymentResult) => void;
+  onPaymentSubmit: (paymentData: PaymentFormData, result: PaymentResult) => void;
 }
 
 export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
-  const [formData, setFormData] = useState<PaymentData>({
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [previousBalance, setPreviousBalance] = useState(0);
+  const { toast } = useToast();
+
+  const [formData, setFormData] = useState<PaymentFormData>({
+    tenant_id: "",
     tenantName: "",
     roomNumber: "",
     month: "",
@@ -28,22 +38,133 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
   const [calculationResult, setCalculationResult] = useState<PaymentResult | null>(null);
 
   useEffect(() => {
+    fetchTenants();
+  }, []);
+
+  useEffect(() => {
+    if (selectedTenant) {
+      fetchPreviousBalance();
+    }
+  }, [selectedTenant, formData.month, formData.year]);
+
+  useEffect(() => {
     const result = calculatePayment(formData);
     setCalculationResult(result);
   }, [formData]);
 
-  const handleInputChange = (field: keyof PaymentData, value: string | number) => {
+  const fetchTenants = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('*')
+        .order('room_number');
+
+      if (error) throw error;
+      setTenants(data || []);
+    } catch (error) {
+      console.error('Error fetching tenants:', error);
+      toast({
+        title: "Error",
+        description: "Gagal memuat data penghuni",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const fetchPreviousBalance = async () => {
+    if (!selectedTenant) return;
+
+    try {
+      // Get outstanding balance from database function
+      const { data, error } = await supabase
+        .rpc('calculate_outstanding_balance', {
+          tenant_id: selectedTenant.id
+        });
+
+      if (error) throw error;
+      
+      const balance = data || 0;
+      setPreviousBalance(balance);
+      setFormData(prev => ({
+        ...prev,
+        previousBalance: balance
+      }));
+    } catch (error) {
+      console.error('Error fetching previous balance:', error);
+      setPreviousBalance(0);
+    }
+  };
+
+  const handleTenantChange = (tenantId: string) => {
+    const tenant = tenants.find(t => t.id === tenantId);
+    if (tenant) {
+      setSelectedTenant(tenant);
+      setFormData(prev => ({
+        ...prev,
+        tenant_id: tenantId,
+        tenantName: tenant.name,
+        roomNumber: tenant.room_number,
+        rentAmount: tenant.monthly_rent
+      }));
+    }
+  };
+
+  const handleInputChange = (field: keyof PaymentFormData, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (calculationResult) {
+    if (!calculationResult || !selectedTenant) return;
+
+    try {
+      // Save payment to database
+      const paymentData = {
+        tenant_id: selectedTenant.id,
+        receipt_number: calculationResult.receiptNumber,
+        payment_date: new Date().toISOString().split('T')[0],
+        period_month: getMonthNumber(formData.month),
+        period_year: formData.year,
+        rent_amount: formData.rentAmount,
+        previous_balance: formData.previousBalance,
+        payment_amount: formData.paymentAmount,
+        discount_amount: formData.discountAmount,
+        remaining_balance: calculationResult.remainingBalance,
+        payment_status: calculationResult.paymentStatus,
+        payment_method: formData.paymentMethod
+      };
+
+      const { error } = await supabase
+        .from('payments')
+        .insert([paymentData]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pembayaran berhasil disimpan"
+      });
+
       onPaymentSubmit(formData, calculationResult);
+    } catch (error) {
+      console.error('Error saving payment:', error);
+      toast({
+        title: "Error",
+        description: "Gagal menyimpan pembayaran",
+        variant: "destructive"
+      });
     }
+  };
+
+  const getMonthNumber = (monthName: string): number => {
+    const months = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+    return months.indexOf(monthName) + 1;
   };
 
   const getPaymentStatus = () => {
@@ -70,167 +191,163 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
       </CardHeader>
       <CardContent className="p-6 space-y-6">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Tenant Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="tenantName" className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Nama Penyewa
-              </Label>
-              <Input
-                id="tenantName"
-                value={formData.tenantName}
-                onChange={(e) => handleInputChange("tenantName", e.target.value)}
-                placeholder="Masukkan nama penyewa"
-                required
-                className="border-primary/20 focus:border-primary"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="roomNumber">Nomor Kamar</Label>
-              <Input
-                id="roomNumber"
-                value={formData.roomNumber}
-                onChange={(e) => handleInputChange("roomNumber", e.target.value)}
-                placeholder="Contoh: A101"
-                required
-                className="border-primary/20 focus:border-primary"
-              />
-            </div>
-          </div>
-
-          {/* Period Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="month" className="flex items-center gap-2">
-                <CalendarDays className="h-4 w-4" />
-                Bulan
-              </Label>
-              <Select onValueChange={(value) => handleInputChange("month", value)} required>
-                <SelectTrigger className="border-primary/20 focus:border-primary">
-                  <SelectValue placeholder="Pilih bulan" />
-                </SelectTrigger>
-                <SelectContent>
-                  {[
-                    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-                    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-                  ].map((month) => (
-                    <SelectItem key={month} value={month}>{month}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="year">Tahun</Label>
-              <Input
-                id="year"
-                type="number"
-                value={formData.year}
-                onChange={(e) => handleInputChange("year", parseInt(e.target.value))}
-                className="border-primary/20 focus:border-primary"
-              />
-            </div>
-          </div>
-
-          {/* Payment Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="rentAmount">Tarif Sewa (Rp)</Label>
-              <Input
-                id="rentAmount"
-                type="number"
-                value={formData.rentAmount}
-                onChange={(e) => handleInputChange("rentAmount", parseInt(e.target.value))}
-                className="border-primary/20 focus:border-primary"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="previousBalance">Tunggakan Sebelumnya (Rp)</Label>
-              <Input
-                id="previousBalance"
-                type="number"
-                value={formData.previousBalance}
-                onChange={(e) => handleInputChange("previousBalance", parseInt(e.target.value))}
-                className="border-primary/20 focus:border-primary"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="paymentAmount">Jumlah Dibayar (Rp)</Label>
-              <Input
-                id="paymentAmount"
-                type="number"
-                value={formData.paymentAmount}
-                onChange={(e) => handleInputChange("paymentAmount", parseInt(e.target.value))}
-                className="border-primary/20 focus:border-primary"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="discountAmount">Diskon (Rp)</Label>
-              <Input
-                id="discountAmount"
-                type="number"
-                value={formData.discountAmount}
-                onChange={(e) => handleInputChange("discountAmount", parseInt(e.target.value))}
-                className="border-primary/20 focus:border-primary"
-              />
-            </div>
-          </div>
-
+          {/* Tenant Selection */}
           <div className="space-y-2">
-            <Label htmlFor="paymentMethod">Metode Pembayaran</Label>
-            <Select onValueChange={(value) => handleInputChange("paymentMethod", value)} defaultValue="cash">
+            <Label htmlFor="tenant" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Pilih Penghuni
+            </Label>
+            <Select onValueChange={handleTenantChange} required>
               <SelectTrigger className="border-primary/20 focus:border-primary">
-                <SelectValue />
+                <SelectValue placeholder="Pilih penghuni" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="cash">Tunai</SelectItem>
-                <SelectItem value="transfer">Transfer Bank</SelectItem>
-                <SelectItem value="ewallet">E-Wallet</SelectItem>
+                {tenants.map((tenant) => (
+                  <SelectItem key={tenant.id} value={tenant.id}>
+                    {tenant.name} - Kamar {tenant.room_number}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Calculation Preview */}
-          {calculationResult && (
-            <Card className="bg-muted/50 border-primary/20">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Calculator className="h-5 w-5" />
-                    Perhitungan Otomatis
-                  </h3>
-                  <Badge variant={paymentStatus.color as any}>
-                    {paymentStatus.status}
-                  </Badge>
+          {selectedTenant && (
+            <>
+              {/* Period Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="month" className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4" />
+                    Bulan
+                  </Label>
+                  <Select onValueChange={(value) => handleInputChange("month", value)} required>
+                    <SelectTrigger className="border-primary/20 focus:border-primary">
+                      <SelectValue placeholder="Pilih bulan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[
+                        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+                      ].map((month) => (
+                        <SelectItem key={month} value={month}>{month}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Total Tagihan:</span>
-                    <span className="font-medium">Rp {calculationResult.totalDue.toLocaleString("id-ID")}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Setelah Diskon:</span>
-                    <span className="font-medium">Rp {calculationResult.totalAfterDiscount.toLocaleString("id-ID")}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Sisa/Kelebihan:</span>
-                    <span className={`font-medium ${calculationResult.remainingBalance > 0 ? 'text-warning' : calculationResult.remainingBalance < 0 ? 'text-success' : 'text-foreground'}`}>
-                      Rp {Math.abs(calculationResult.remainingBalance).toLocaleString("id-ID")}
-                    </span>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="year">Tahun</Label>
+                  <Input
+                    id="year"
+                    type="number"
+                    value={formData.year}
+                    onChange={(e) => handleInputChange("year", parseInt(e.target.value))}
+                    className="border-primary/20 focus:border-primary"
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              </div>
 
-          <Button type="submit" className="w-full" size="lg">
-            <Receipt className="h-4 w-4 mr-2" />
-            Buat Kwitansi
-          </Button>
+              {/* Payment Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="rentAmount">Tarif Sewa (Rp)</Label>
+                  <Input
+                    id="rentAmount"
+                    type="number"
+                    value={formData.rentAmount}
+                    onChange={(e) => handleInputChange("rentAmount", parseInt(e.target.value))}
+                    className="border-primary/20 focus:border-primary"
+                    readOnly
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="previousBalance">Tunggakan Otomatis (Rp)</Label>
+                  <Input
+                    id="previousBalance"
+                    type="number"
+                    value={previousBalance}
+                    className="border-primary/20 focus:border-primary bg-muted"
+                    readOnly
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="paymentAmount">Jumlah Dibayar (Rp)</Label>
+                  <Input
+                    id="paymentAmount"
+                    type="number"
+                    value={formData.paymentAmount}
+                    onChange={(e) => handleInputChange("paymentAmount", parseInt(e.target.value))}
+                    className="border-primary/20 focus:border-primary"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="discountAmount">Diskon (Rp)</Label>
+                  <Input
+                    id="discountAmount"
+                    type="number"
+                    value={formData.discountAmount}
+                    onChange={(e) => handleInputChange("discountAmount", parseInt(e.target.value))}
+                    className="border-primary/20 focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="paymentMethod">Metode Pembayaran</Label>
+                <Select onValueChange={(value) => handleInputChange("paymentMethod", value)} defaultValue="cash">
+                  <SelectTrigger className="border-primary/20 focus:border-primary">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Tunai</SelectItem>
+                    <SelectItem value="transfer">Transfer Bank</SelectItem>
+                    <SelectItem value="ewallet">E-Wallet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Calculation Preview */}
+              {calculationResult && (
+                <Card className="bg-muted/50 border-primary/20">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <Calculator className="h-5 w-5" />
+                        Perhitungan Otomatis
+                      </h3>
+                      <Badge variant={paymentStatus.color as any}>
+                        {paymentStatus.status}
+                      </Badge>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Total Tagihan:</span>
+                        <span className="font-medium">Rp {calculationResult.totalDue.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Setelah Diskon:</span>
+                        <span className="font-medium">Rp {calculationResult.totalAfterDiscount.toLocaleString("id-ID")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Sisa/Kelebihan:</span>
+                        <span className={`font-medium ${calculationResult.remainingBalance > 0 ? 'text-warning' : calculationResult.remainingBalance < 0 ? 'text-success' : 'text-foreground'}`}>
+                          Rp {Math.abs(calculationResult.remainingBalance).toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Button type="submit" className="w-full" size="lg">
+                <Receipt className="h-4 w-4 mr-2" />
+                Buat Kwitansi
+              </Button>
+            </>
+          )}
         </form>
       </CardContent>
     </Card>

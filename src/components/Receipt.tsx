@@ -1,12 +1,16 @@
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Printer, Download, ArrowLeft } from "lucide-react";
-import { PaymentData, PaymentResult, formatCurrency, formatDate, numberToWords } from "@/lib/paymentCalculator";
+import { PaymentFormData } from "@/lib/supabaseTypes";
+import { PaymentResult, formatCurrency, formatDate, numberToWords } from "@/lib/paymentCalculator";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface ReceiptProps {
-  paymentData: PaymentData;
+  paymentData: PaymentFormData;
   paymentResult: PaymentResult;
   onBack: () => void;
 }
@@ -14,6 +18,36 @@ interface ReceiptProps {
 export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptProps) {
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById('receipt-content');
+    if (!element) return;
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      const imgY = 10;
+      
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      pdf.save(`kwitansi-${paymentResult.receiptNumber}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Gagal mengunduh PDF. Silakan coba lagi.');
+    }
   };
 
   const getPaymentStatusBadge = () => {
@@ -42,7 +76,7 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
             <Printer className="h-4 w-4" />
             Cetak
           </Button>
-          <Button variant="outline" className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleDownloadPDF} className="flex items-center gap-2">
             <Download className="h-4 w-4" />
             Download PDF
           </Button>
@@ -50,7 +84,7 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
       </div>
 
       {/* Receipt */}
-      <Card className="bg-receipt-bg border-receipt-border shadow-lg print:shadow-none print:border-2">
+      <Card id="receipt-content" className="bg-receipt-bg border-receipt-border shadow-lg print:shadow-none print:border-2">
         <CardContent className="p-8 print:p-6">
           {/* Header with Watermark */}
           <div className="relative mb-8">

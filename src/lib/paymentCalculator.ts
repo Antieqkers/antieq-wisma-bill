@@ -1,14 +1,4 @@
-export interface PaymentData {
-  tenantName: string;
-  roomNumber: string;
-  month: string;
-  year: number;
-  rentAmount: number;
-  previousBalance: number;
-  paymentAmount: number;
-  discountAmount: number;
-  paymentMethod: string;
-}
+import { PaymentFormData } from "./supabaseTypes";
 
 export interface PaymentResult {
   totalDue: number;
@@ -19,7 +9,7 @@ export interface PaymentResult {
   paymentDate: Date;
 }
 
-export function calculatePayment(data: PaymentData): PaymentResult {
+export function calculatePayment(data: PaymentFormData): PaymentResult {
   // Calculate total due (rent + previous balance)
   const totalDue = data.rentAmount + data.previousBalance;
   
