@@ -85,10 +85,10 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
     try {
       console.log('Calculating previous balance for tenant:', selectedTenant.id);
       
-      // Use the fixed function name with parameter
+      // Use the correct parameter name for the function
       const { data, error } = await supabase
         .rpc('calculate_outstanding_balance', {
-          p_tenant_id: selectedTenant.id
+          tenant_id: selectedTenant.id
         });
 
       if (error) {
@@ -150,7 +150,7 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
       console.log('Submitting payment data:', formData);
       console.log('Calculation result:', calculationResult);
 
-      // Prepare payment data for database
+      // Prepare payment data for database - remove description from main object
       const paymentData = {
         tenant_id: selectedTenant.id,
         receipt_number: calculationResult.receiptNumber,
@@ -164,13 +164,12 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
         remaining_balance: calculationResult.remainingBalance,
         payment_status: calculationResult.paymentStatus,
         payment_method: formData.paymentMethod,
-        notes: `Pembayaran sewa bulan ${formData.month} ${formData.year}`,
-        description: description || null
+        notes: `Pembayaran sewa bulan ${formData.month} ${formData.year}`
       };
 
       console.log('Inserting payment data:', paymentData);
 
-      // Insert payment record
+      // Insert payment record without description first
       const { data: insertedData, error: insertError } = await supabase
         .from('payments')
         .insert([paymentData])
@@ -184,12 +183,29 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
 
       console.log('Payment inserted successfully:', insertedData);
 
-      // Update tenant balance using the fixed function
+      // If description exists, update the record separately to handle schema cache issue
+      if (description && description.trim()) {
+        try {
+          const { error: updateError } = await supabase
+            .from('payments')
+            .update({ description: description.trim() })
+            .eq('id', insertedData.id);
+
+          if (updateError) {
+            console.warn('Could not update description, but payment was saved:', updateError);
+            // Don't throw error here as payment was successful
+          }
+        } catch (descError) {
+          console.warn('Description update failed, but payment was saved:', descError);
+        }
+      }
+
+      // Update tenant balance using the correct function parameter
       if (calculationResult.remainingBalance !== 0) {
         try {
           const { error: updateError } = await supabase
             .rpc('update_tenant_balance', {
-              p_tenant_id: selectedTenant.id
+              tenant_id: selectedTenant.id
             });
 
           if (updateError) {
