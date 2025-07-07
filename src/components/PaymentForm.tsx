@@ -54,12 +54,18 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
 
   const fetchTenants = async () => {
     try {
+      console.log('Fetching tenants...');
       const { data, error } = await supabase
         .from('tenants')
         .select('*')
         .order('room_number');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching tenants:', error);
+        throw error;
+      }
+      
+      console.log('Fetched tenants:', data);
       setTenants(data || []);
     } catch (error) {
       console.error('Error fetching tenants:', error);
@@ -75,14 +81,20 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
     if (!selectedTenant) return;
 
     try {
-      // Calculate outstanding balance based on checkin date and current period
+      console.log('Calculating previous balance for tenant:', selectedTenant.id);
+      
+      // Calculate outstanding balance based on checkin date
       const { data, error } = await supabase
         .rpc('calculate_outstanding_balance', {
           tenant_id: selectedTenant.id
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error calculating balance:', error);
+        throw error;
+      }
       
+      console.log('Calculated balance:', data);
       const balance = data || 0;
       setPreviousBalance(balance);
       setFormData(prev => ({
@@ -91,7 +103,12 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
       }));
     } catch (error) {
       console.error('Error fetching previous balance:', error);
+      // Set balance to 0 if there's an error
       setPreviousBalance(0);
+      setFormData(prev => ({
+        ...prev,
+        previousBalance: 0
+      }));
     }
   };
 
@@ -118,10 +135,20 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!calculationResult || !selectedTenant) return;
+    if (!calculationResult || !selectedTenant) {
+      toast({
+        title: "Error",
+        description: "Pilih penghuni terlebih dahulu",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
-      // Save payment to database
+      console.log('Submitting payment data:', formData);
+      console.log('Calculation result:', calculationResult);
+
+      // Prepare payment data for database
       const paymentData = {
         tenant_id: selectedTenant.id,
         receipt_number: calculationResult.receiptNumber,
@@ -134,26 +161,75 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
         discount_amount: formData.discountAmount,
         remaining_balance: calculationResult.remainingBalance,
         payment_status: calculationResult.paymentStatus,
-        payment_method: formData.paymentMethod
+        payment_method: formData.paymentMethod,
+        notes: `Pembayaran sewa bulan ${formData.month} ${formData.year}`
       };
 
-      const { error } = await supabase
-        .from('payments')
-        .insert([paymentData]);
+      console.log('Inserting payment data:', paymentData);
 
-      if (error) throw error;
+      // Insert payment record
+      const { data: insertedData, error: insertError } = await supabase
+        .from('payments')
+        .insert([paymentData])
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error inserting payment:', insertError);
+        throw insertError;
+      }
+
+      console.log('Payment inserted successfully:', insertedData);
+
+      // Update tenant balance if needed
+      if (calculationResult.remainingBalance !== 0) {
+        try {
+          const { error: updateError } = await supabase
+            .rpc('update_tenant_balance', {
+              tenant_id: selectedTenant.id
+            });
+
+          if (updateError) {
+            console.error('Error updating tenant balance:', updateError);
+            // Don't throw here as the payment was successful
+          }
+        } catch (balanceError) {
+          console.error('Balance update error:', balanceError);
+          // Continue as payment was successful
+        }
+      }
 
       toast({
         title: "Berhasil",
-        description: "Pembayaran berhasil disimpan"
+        description: "Pembayaran berhasil disimpan",
+        variant: "default"
       });
 
+      // Call the callback to show receipt
       onPaymentSubmit(formData, calculationResult);
+
+      // Reset form
+      setFormData({
+        tenant_id: "",
+        tenantName: "",
+        roomNumber: "",
+        month: "",
+        year: new Date().getFullYear(),
+        rentAmount: 500000,
+        previousBalance: 0,
+        paymentAmount: 0,
+        discountAmount: 0,
+        paymentMethod: "cash"
+      });
+      setSelectedTenant(null);
+      setPreviousBalance(0);
+      setCalculationResult(null);
+
     } catch (error) {
       console.error('Error saving payment:', error);
       toast({
         title: "Error",
-        description: "Gagal menyimpan pembayaran",
+        description: `Gagal menyimpan pembayaran: ${error.message || 'Unknown error'}`,
         variant: "destructive"
       });
     }
@@ -197,7 +273,7 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
               <User className="h-4 w-4" />
               Pilih Penghuni
             </Label>
-            <Select onValueChange={handleTenantChange} required>
+            <Select onValueChange={handleTenantChange} value={formData.tenant_id} required>
               <SelectTrigger className="border-primary/20 focus:border-primary">
                 <SelectValue placeholder="Pilih penghuni" />
               </SelectTrigger>
@@ -235,7 +311,7 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
                     <CalendarDays className="h-4 w-4" />
                     Bulan Pembayaran
                   </Label>
-                  <Select onValueChange={(value) => handleInputChange("month", value)} required>
+                  <Select onValueChange={(value) => handleInputChange("month", value)} value={formData.month} required>
                     <SelectTrigger className="border-primary/20 focus:border-primary">
                       <SelectValue placeholder="Pilih bulan" />
                     </SelectTrigger>
@@ -315,7 +391,7 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="paymentMethod">Metode Pembayaran</Label>
-                <Select onValueChange={(value) => handleInputChange("paymentMethod", value)} defaultValue="cash">
+                <Select onValueChange={(value) => handleInputChange("paymentMethod", value)} value={formData.paymentMethod}>
                   <SelectTrigger className="border-primary/20 focus:border-primary">
                     <SelectValue />
                   </SelectTrigger>
