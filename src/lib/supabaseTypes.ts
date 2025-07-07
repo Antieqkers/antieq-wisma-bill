@@ -26,6 +26,7 @@ export interface Payment {
   payment_status: 'lunas' | 'kurang_bayar' | 'lebih_bayar';
   payment_method: 'cash' | 'transfer' | 'ewallet';
   notes?: string;
+  description?: string;
   created_at?: string;
   updated_at?: string;
 }

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, User, CreditCard, Receipt, Calculator } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +36,7 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
     paymentMethod: "cash"
   });
 
+  const [description, setDescription] = useState("");
   const [calculationResult, setCalculationResult] = useState<PaymentResult | null>(null);
 
   useEffect(() => {
@@ -83,10 +85,10 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
     try {
       console.log('Calculating previous balance for tenant:', selectedTenant.id);
       
-      // Calculate outstanding balance based on checkin date
+      // Use the fixed function name with parameter
       const { data, error } = await supabase
         .rpc('calculate_outstanding_balance', {
-          tenant_id: selectedTenant.id
+          p_tenant_id: selectedTenant.id
         });
 
       if (error) {
@@ -162,7 +164,8 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
         remaining_balance: calculationResult.remainingBalance,
         payment_status: calculationResult.paymentStatus,
         payment_method: formData.paymentMethod,
-        notes: `Pembayaran sewa bulan ${formData.month} ${formData.year}`
+        notes: `Pembayaran sewa bulan ${formData.month} ${formData.year}`,
+        description: description || null
       };
 
       console.log('Inserting payment data:', paymentData);
@@ -181,12 +184,12 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
 
       console.log('Payment inserted successfully:', insertedData);
 
-      // Update tenant balance if needed
+      // Update tenant balance using the fixed function
       if (calculationResult.remainingBalance !== 0) {
         try {
           const { error: updateError } = await supabase
             .rpc('update_tenant_balance', {
-              tenant_id: selectedTenant.id
+              p_tenant_id: selectedTenant.id
             });
 
           if (updateError) {
@@ -224,8 +227,9 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
       setSelectedTenant(null);
       setPreviousBalance(0);
       setCalculationResult(null);
+      setDescription("");
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving payment:', error);
       toast({
         title: "Error",
@@ -401,6 +405,19 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
                     <SelectItem value="ewallet">E-Wallet</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Keterangan/Description Field */}
+              <div className="space-y-2">
+                <Label htmlFor="description">Keterangan (Opsional)</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Masukkan keterangan tambahan jika diperlukan..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="border-primary/20 focus:border-primary"
+                  rows={3}
+                />
               </div>
 
               {/* Calculation Preview */}
