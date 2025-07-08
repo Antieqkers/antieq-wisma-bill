@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -60,6 +61,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
     try {
       console.log('Calculating previous balance for tenant:', selectedTenant.id);
       
+      // Gunakan fungsi database untuk menghitung tunggakan
       const { data, error } = await supabase
         .rpc('calculate_outstanding_balance', {
           tenant_id: selectedTenant.id
@@ -79,11 +81,59 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
       }));
     } catch (error) {
       console.error('Error fetching previous balance:', error);
-      setPreviousBalance(0);
+      // Fallback: hitung manual jika fungsi database gagal
+      await calculateManualBalance();
+    }
+  };
+
+  const calculateManualBalance = async () => {
+    if (!selectedTenant) return;
+
+    try {
+      console.log('Calculating manual balance for tenant:', selectedTenant.id);
+      
+      // Hitung bulan yang sudah berlalu sejak check-in
+      const checkinDate = new Date(selectedTenant.checkin_date);
+      const currentDate = new Date();
+      const monthsPassed = (currentDate.getFullYear() - checkinDate.getFullYear()) * 12 + 
+                          (currentDate.getMonth() - checkinDate.getMonth());
+      
+      console.log('Months passed since checkin:', monthsPassed);
+      
+      if (monthsPassed < 1) {
+        setPreviousBalance(0);
+        setFormData(prev => ({ ...prev, previousBalance: 0 }));
+        return;
+      }
+
+      // Total yang seharusnya dibayar
+      const totalShouldPay = selectedTenant.monthly_rent * monthsPassed;
+      
+      // Total yang sudah dibayar
+      const { data: payments, error: paymentsError } = await supabase
+        .from('payments')
+        .select('payment_amount')
+        .eq('tenant_id', selectedTenant.id);
+
+      if (paymentsError) {
+        console.error('Error fetching payments:', paymentsError);
+        throw paymentsError;
+      }
+
+      const totalPaid = payments?.reduce((sum, payment) => sum + payment.payment_amount, 0) || 0;
+      const outstanding = Math.max(totalShouldPay - totalPaid, 0);
+      
+      console.log('Manual calculation - Should pay:', totalShouldPay, 'Paid:', totalPaid, 'Outstanding:', outstanding);
+      
+      setPreviousBalance(outstanding);
       setFormData(prev => ({
         ...prev,
-        previousBalance: 0
+        previousBalance: outstanding
       }));
+    } catch (error) {
+      console.error('Error in manual balance calculation:', error);
+      setPreviousBalance(0);
+      setFormData(prev => ({ ...prev, previousBalance: 0 }));
     }
   };
 
@@ -131,6 +181,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
       console.log('Submitting payment data:', formData);
       console.log('Calculation result:', calculationResult);
 
+      // Siapkan data pembayaran sesuai dengan schema database
       const paymentData = {
         tenant_id: selectedTenant.id,
         receipt_number: calculationResult.receiptNumber,
@@ -140,7 +191,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
         rent_amount: formData.rentAmount,
         previous_balance: formData.previousBalance,
         payment_amount: formData.paymentAmount,
-        discount_amount: formData.discountAmount,
+        discount_amount: formData.discountAmount || 0,
         remaining_balance: calculationResult.remainingBalance,
         payment_status: calculationResult.paymentStatus,
         payment_method: formData.paymentMethod,
@@ -149,6 +200,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
 
       console.log('Inserting payment data:', paymentData);
 
+      // Insert pembayaran ke database
       const { data: insertedData, error: insertError } = await supabase
         .from('payments')
         .insert([paymentData])
@@ -162,6 +214,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
 
       console.log('Payment inserted successfully:', insertedData);
 
+      // Update balance penghuni jika ada sisa tagihan
       if (calculationResult.remainingBalance !== 0) {
         try {
           const { error: updateError } = await supabase
@@ -171,6 +224,8 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
 
           if (updateError) {
             console.error('Error updating tenant balance:', updateError);
+          } else {
+            console.log('Tenant balance updated successfully');
           }
         } catch (balanceError) {
           console.error('Balance update error:', balanceError);
@@ -179,18 +234,32 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
 
       toast({
         title: "Berhasil",
-        description: "Pembayaran berhasil disimpan",
+        description: "Pembayaran berhasil disimpan dan kwitansi telah dibuat",
         variant: "default"
       });
 
+      // Callback untuk membuat kwitansi
       onPaymentSubmit(formData, calculationResult);
       resetForm();
 
     } catch (error: any) {
       console.error('Error saving payment:', error);
+      
+      // Error handling yang lebih spesifik
+      let errorMessage = "Gagal menyimpan pembayaran";
+      if (error?.message?.includes('duplicate key')) {
+        errorMessage = "Nomor kwitansi sudah ada, silakan coba lagi";
+      } else if (error?.message?.includes('foreign key')) {
+        errorMessage = "Data penghuni tidak valid";
+      } else if (error?.message?.includes('check constraint')) {
+        errorMessage = "Data pembayaran tidak valid";
+      } else if (error?.message) {
+        errorMessage = `Gagal menyimpan pembayaran: ${error.message}`;
+      }
+      
       toast({
         title: "Error",
-        description: `Gagal menyimpan pembayaran: ${error.message || 'Unknown error'}`,
+        description: errorMessage,
         variant: "destructive"
       });
     }
