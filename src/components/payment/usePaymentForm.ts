@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -145,7 +144,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
         remaining_balance: calculationResult.remainingBalance,
         payment_status: calculationResult.paymentStatus,
         payment_method: formData.paymentMethod,
-        notes: `Pembayaran sewa bulan ${formData.month} ${formData.year}`
+        notes: description && description.trim() ? description.trim() : `Pembayaran sewa bulan ${formData.month} ${formData.year}`
       };
 
       console.log('Inserting payment data:', paymentData);
@@ -162,21 +161,6 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
       }
 
       console.log('Payment inserted successfully:', insertedData);
-
-      if (description && description.trim()) {
-        try {
-          const { error: updateError } = await supabase
-            .from('payments')
-            .update({ description: description.trim() })
-            .eq('id', insertedData.id);
-
-          if (updateError) {
-            console.warn('Could not update description, but payment was saved:', updateError);
-          }
-        } catch (descError) {
-          console.warn('Description update failed, but payment was saved:', descError);
-        }
-      }
 
       if (calculationResult.remainingBalance !== 0) {
         try {
