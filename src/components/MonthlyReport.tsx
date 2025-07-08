@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Download, Calendar } from "lucide-react";
+import { FileText, Download, Calendar, Edit, Trash2, Printer } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Payment, Tenant } from "@/lib/supabaseTypes";
@@ -21,6 +22,8 @@ export default function MonthlyReport() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [editingPayment, setEditingPayment] = useState<PaymentWithTenant | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -51,6 +54,112 @@ export default function MonthlyReport() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleEditPayment = (payment: PaymentWithTenant) => {
+    setEditingPayment(payment);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdatePayment = async () => {
+    if (!editingPayment) return;
+
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .update({
+          payment_amount: editingPayment.payment_amount,
+          discount_amount: editingPayment.discount_amount,
+          notes: editingPayment.notes
+        })
+        .eq('id', editingPayment.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pembayaran berhasil diperbarui"
+      });
+
+      setIsEditDialogOpen(false);
+      setEditingPayment(null);
+      fetchMonthlyPayments();
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      toast({
+        title: "Error",
+        description: "Gagal memperbarui pembayaran",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus pembayaran ini?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .delete()
+        .eq('id', paymentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Pembayaran berhasil dihapus"
+      });
+
+      fetchMonthlyPayments();
+    } catch (error) {
+      console.error('Error deleting payment:', error);
+      toast({
+        title: "Error",
+        description: "Gagal menghapus pembayaran",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handlePrintReceipt = (payment: PaymentWithTenant) => {
+    // Create a new window with the receipt content
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Kwitansi ${payment.receipt_number}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .header { text-align: center; margin-bottom: 20px; }
+              .content { margin: 20px 0; }
+              .footer { margin-top: 40px; text-align: right; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h2>ANTIEQ WISMA KOST</h2>
+              <p>KWITANSI PEMBAYARAN</p>
+              <p>No: ${payment.receipt_number}</p>
+            </div>
+            <div class="content">
+              <p><strong>Nama:</strong> ${payment.tenants.name}</p>
+              <p><strong>Kamar:</strong> ${payment.tenants.room_number}</p>
+              <p><strong>Periode:</strong> ${payment.period_month}/${payment.period_year}</p>
+              <p><strong>Jumlah Bayar:</strong> ${formatCurrency(payment.payment_amount)}</p>
+              <p><strong>Tanggal:</strong> ${formatDate(payment.payment_date)}</p>
+            </div>
+            <div class="footer">
+              <p>ANTIEQ WISMA</p>
+              <br>
+              <p>________________</p>
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
     }
   };
 
@@ -205,6 +314,7 @@ export default function MonthlyReport() {
                   <TableHead>Dibayar</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Metode</TableHead>
+                  <TableHead>Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -223,6 +333,34 @@ export default function MonthlyReport() {
                       {payment.payment_method === 'cash' ? 'Tunai' : 
                        payment.payment_method === 'transfer' ? 'Transfer' : 'E-Wallet'}
                     </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditPayment(payment)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeletePayment(payment.id)}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePrintReceipt(payment)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -230,6 +368,62 @@ export default function MonthlyReport() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Pembayaran</DialogTitle>
+          </DialogHeader>
+          {editingPayment && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-amount">Jumlah Pembayaran</Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  value={editingPayment.payment_amount}
+                  onChange={(e) => setEditingPayment({
+                    ...editingPayment,
+                    payment_amount: parseFloat(e.target.value) || 0
+                  })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-discount">Diskon</Label>
+                <Input
+                  id="edit-discount"
+                  type="number"
+                  value={editingPayment.discount_amount}
+                  onChange={(e) => setEditingPayment({
+                    ...editingPayment,
+                    discount_amount: parseFloat(e.target.value) || 0
+                  })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-notes">Catatan</Label>
+                <Input
+                  id="edit-notes"
+                  value={editingPayment.notes || ''}
+                  onChange={(e) => setEditingPayment({
+                    ...editingPayment,
+                    notes: e.target.value
+                  })}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Batal
+                </Button>
+                <Button onClick={handleUpdatePayment}>
+                  Simpan
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

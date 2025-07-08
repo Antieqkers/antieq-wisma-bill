@@ -1,15 +1,17 @@
 
 import { useState } from "react";
-import { Building2, Users, CreditCard, FileText } from "lucide-react";
+import { Building2, Users, CreditCard, FileText, Receipt, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PaymentForm from "@/components/PaymentForm";
 import Receipt from "@/components/Receipt";
 import TenantManagement from "@/components/TenantManagement";
 import MonthlyReport from "@/components/MonthlyReport";
+import ExpenseManager from "@/components/ExpenseManager";
+import FinancialReport from "@/components/FinancialReport";
 import { PaymentFormData } from "@/lib/supabaseTypes";
 import { PaymentResult } from "@/lib/paymentCalculator";
 
-type ViewType = "form" | "receipt" | "tenants" | "reports";
+type ViewType = "form" | "receipt" | "tenants" | "reports" | "expenses" | "financial";
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<ViewType>("form");
@@ -32,6 +34,8 @@ const Index = () => {
       case "receipt": return "Kwitansi Pembayaran";
       case "tenants": return "Manajemen Penghuni";
       case "reports": return "Laporan Bulanan";
+      case "expenses": return "Manajemen Pengeluaran";
+      case "financial": return "Laporan Keuangan";
       default: return "Input Pembayaran Sewa Kamar";
     }
   };
@@ -42,6 +46,8 @@ const Index = () => {
       case "receipt": return "Kwitansi resmi pembayaran sewa kamar ANTIEQ WISMA KOST";
       case "tenants": return "Kelola data penghuni kost";
       case "reports": return "Laporan transaksi pembayaran per bulan";
+      case "expenses": return "Kelola pengeluaran operasional kost";
+      case "financial": return "Analisis keuangan dan laporan laba rugi";
       default: return "Lengkapi form di bawah untuk membuat kwitansi pembayaran";
     }
   };
@@ -89,6 +95,22 @@ const Index = () => {
               <FileText className="h-4 w-4" />
               Laporan
             </Button>
+            <Button
+              variant={currentView === "expenses" ? "default" : "ghost"}
+              onClick={() => setCurrentView("expenses")}
+              className="flex items-center gap-2"
+            >
+              <Receipt className="h-4 w-4" />
+              Pengeluaran
+            </Button>
+            <Button
+              variant={currentView === "financial" ? "default" : "ghost"}
+              onClick={() => setCurrentView("financial")}
+              className="flex items-center gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Keuangan
+            </Button>
           </div>
         </div>
       </nav>
@@ -131,6 +153,10 @@ const Index = () => {
         {currentView === "tenants" && <TenantManagement />}
 
         {currentView === "reports" && <MonthlyReport />}
+
+        {currentView === "expenses" && <ExpenseManager />}
+
+        {currentView === "financial" && <FinancialReport />}
       </main>
 
       {/* Footer */}
@@ -142,8 +168,9 @@ const Index = () => {
               <span className="text-xl font-bold">ANTIEQ WISMA KOST</span>
             </div>
             <div className="text-sm opacity-90 space-y-1">
-              <p>Jl. Contoh Alamat No. 123, Jakarta Selatan</p>
-              <p>Telp: (021) 1234-5678 | WhatsApp: 0812-3456-7890</p>
+              <p>JL. Drs HASAN KADIR desa BUTU kec TILONGKABILA</p>
+              <p>BONEBOLANGO GORONTALO</p>
+              <p>Telp: 0821 8753 5727 | WhatsApp: 0821 8753 5727</p>
               <p>Email: info@antieqwisma.com</p>
             </div>
             <div className="text-xs opacity-75 pt-4 border-t border-primary-light">

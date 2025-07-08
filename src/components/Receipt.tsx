@@ -29,7 +29,9 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        width: 794, // A4 width in pixels at 96 DPI
+        height: 1123 // A4 height in pixels at 96 DPI
       });
       
       const imgData = canvas.toDataURL('image/png');
@@ -37,13 +39,19 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      // Calculate scaling to fit A4 properly
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 10;
+      const ratio = Math.min(pdfWidth / (imgWidth * 0.264583), pdfHeight / (imgHeight * 0.264583));
       
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+      const scaledWidth = imgWidth * 0.264583 * ratio;
+      const scaledHeight = imgHeight * 0.264583 * ratio;
+      
+      const x = (pdfWidth - scaledWidth) / 2;
+      const y = 5;
+      
+      pdf.addImage(imgData, 'PNG', x, y, scaledWidth, scaledHeight);
       pdf.save(`kwitansi-${paymentResult.receiptNumber}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -84,57 +92,43 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
         </div>
       </div>
 
-      {/* Receipt */}
-      <Card id="receipt-content" className="bg-white border-2 border-stone-200 shadow-lg print:shadow-none print:border-2">
-        <CardContent className="p-8 print:p-6">
-          {/* Header with Logo and Watermark */}
-          <div className="relative mb-8">
-            {/* Enhanced Watermark */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-8 pointer-events-none z-10">
-              <div className="text-6xl font-bold text-stone-300 transform rotate-12 tracking-wider">
-                ANTIEQ WISMA<br />
-                <span className="text-4xl">MANAJEMEN</span>
-              </div>
+      {/* Receipt - Optimized for A4 */}
+      <Card id="receipt-content" className="bg-white border-2 border-stone-200 shadow-lg print:shadow-none print:border-2 max-w-[210mm] mx-auto">
+        <CardContent className="p-8 print:p-6 relative">
+          {/* Header with Logo */}
+          <div className="text-center space-y-4 mb-6">
+            {/* Logo */}
+            <div className="flex justify-center mb-4">
+              <img 
+                src="/lovable-uploads/3da050e2-be00-4460-9d02-c768ffe65c14.png" 
+                alt="ANTIEQ WISMA KOST Logo" 
+                className="h-20 w-auto object-contain"
+              />
             </div>
             
-            {/* Header Content */}
-            <div className="relative z-20 text-center space-y-4">
-              {/* Logo */}
-              <div className="flex justify-center mb-4">
-                <img 
-                  src="/lovable-uploads/3da050e2-be00-4460-9d02-c768ffe65c14.png" 
-                  alt="ANTIEQ WISMA KOST Logo" 
-                  className="h-20 w-auto object-contain"
-                />
-              </div>
-              
-              <h1 className="text-3xl font-bold text-stone-800">ANTIEQ WISMA KOST</h1>
-              <div className="text-stone-700 space-y-2">
-                <p className="text-lg font-medium">JL. Drs HASAN KADIR desa BUTU kec TILONGKABILA</p>
-                <p className="text-lg font-medium">BONEBOLANGO GORONTALO</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm mt-3">
-                  <div className="space-y-1">
-                    <p><strong>Telp:</strong> 0821 8753 5727</p>
-                    <p><strong>WhatsApp:</strong> 0821 8753 5727</p>
-                    <p><strong>Email:</strong> info@antieqwisma.com</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p><strong>Instagram:</strong> @antieqwisma_kost</p>
-                    <p><strong>TikTok:</strong> @antieqmediatv</p>
-                    <p><strong>Facebook:</strong> @Antieq Wisma Kost</p>
-                  </div>
+            <h1 className="text-3xl font-bold text-stone-800">ANTIEQ WISMA KOST</h1>
+            <div className="text-stone-700 space-y-2">
+              <p className="text-lg font-medium">JL. Drs HASAN KADIR desa BUTU kec TILONGKABILA</p>
+              <p className="text-lg font-medium">BONEBOLANGO GORONTALO</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm mt-3">
+                <div className="space-y-1">
+                  <p><strong>Telp:</strong> 0821 8753 5727</p>
+                  <p><strong>WhatsApp:</strong> 0821 8753 5727</p>
+                  <p><strong>Email:</strong> info@antieqwisma.com</p>
+                </div>
+                <div className="space-y-1">
+                  <p><strong>Instagram:</strong> @antieqwisma_kost</p>
+                  <p><strong>TikTok:</strong> @antieqmediatv</p>
+                  <p><strong>Facebook:</strong> @Antieq Wisma Kost</p>
                 </div>
               </div>
-              <Separator className="my-4 bg-stone-300" />
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-stone-800">KWITANSI PEMBAYARAN</h2>
-                {getPaymentStatusBadge()}
-              </div>
             </div>
+            <Separator className="my-4 bg-stone-300" />
+            <h2 className="text-2xl font-bold text-stone-800">KWITANSI PEMBAYARAN</h2>
           </div>
 
           {/* Receipt Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {/* Left Column */}
             <div className="space-y-4">
               <div>
@@ -149,14 +143,14 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
                 <p className="text-sm text-stone-600">Nama Penyewa</p>
                 <p className="font-semibold text-lg text-stone-800">{paymentData.tenantName}</p>
               </div>
-              <div>
-                <p className="text-sm text-stone-600">Nomor Kamar</p>
-                <p className="font-semibold text-lg text-stone-800">{paymentData.roomNumber}</p>
-              </div>
             </div>
 
             {/* Right Column */}
             <div className="space-y-4">
+              <div>
+                <p className="text-sm text-stone-600">Nomor Kamar</p>
+                <p className="font-semibold text-lg text-stone-800">{paymentData.roomNumber}</p>
+              </div>
               <div>
                 <p className="text-sm text-stone-600">Periode Pembayaran</p>
                 <p className="font-semibold text-lg text-stone-800">{paymentData.month} {paymentData.year}</p>
@@ -165,15 +159,25 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
                 <p className="text-sm text-stone-600">Metode Pembayaran</p>
                 <p className="font-semibold text-stone-800 capitalize">{paymentData.paymentMethod === 'cash' ? 'Tunai' : paymentData.paymentMethod === 'transfer' ? 'Transfer Bank' : 'E-Wallet'}</p>
               </div>
-              <div>
+            </div>
+          </div>
+
+          {/* Watermark - Positioned between Nama Penyewa and Status */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <div className="text-4xl font-bold text-stone-200 transform rotate-12 tracking-wider text-center opacity-30">
+                ANTIEQ WISMA<br />
+                <span className="text-2xl">MANAJEMEN</span>
+              </div>
+            </div>
+            
+            {/* Status Pembayaran */}
+            <div className="relative z-20 text-center py-8">
+              <div className="space-y-2">
                 <p className="text-sm text-stone-600">Status Pembayaran</p>
-                <p className={`font-semibold ${
-                  paymentResult.paymentStatus === 'lunas' ? 'text-green-600' :
-                  paymentResult.paymentStatus === 'kurang_bayar' ? 'text-amber-600' : 'text-blue-600'
-                }`}>
-                  {paymentResult.paymentStatus === 'lunas' ? 'LUNAS' :
-                   paymentResult.paymentStatus === 'kurang_bayar' ? 'KURANG BAYAR' : 'LEBIH BAYAR'}
-                </p>
+                <div className="flex justify-center">
+                  {getPaymentStatusBadge()}
+                </div>
               </div>
             </div>
           </div>
@@ -181,7 +185,7 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
           <Separator className="my-6 bg-stone-300" />
 
           {/* Detailed Payment Breakdown */}
-          <div className="space-y-6 mb-8">
+          <div className="space-y-6 mb-6">
             <h3 className="text-xl font-bold text-stone-800">RINCIAN PEMBAYARAN LENGKAP</h3>
             
             {/* Main Calculation Table */}
@@ -270,7 +274,7 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
           </div>
 
           {/* Amount in Words */}
-          <div className="mb-8">
+          <div className="mb-6">
             <p className="text-sm text-stone-600 mb-2">Terbilang (Jumlah Dibayar):</p>
             <div className="border border-stone-300 rounded-lg p-4 bg-stone-50">
               <p className="text-lg font-semibold italic capitalize text-stone-800">
