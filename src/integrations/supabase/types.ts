@@ -159,11 +159,11 @@ export type Database = {
     }
     Functions: {
       calculate_outstanding_balance: {
-        Args: { tenant_id: string; target_date?: string }
+        Args: { p_tenant_id: string; target_date?: string }
         Returns: number
       }
       update_tenant_balance: {
-        Args: { tenant_id: string }
+        Args: { p_tenant_id: string }
         Returns: undefined
       }
     }

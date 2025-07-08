@@ -61,10 +61,10 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
     try {
       console.log('Calculating previous balance for tenant:', selectedTenant.id);
       
-      // Gunakan fungsi database untuk menghitung tunggakan
+      // Use the fixed database function to calculate outstanding balance
       const { data, error } = await supabase
         .rpc('calculate_outstanding_balance', {
-          tenant_id: selectedTenant.id
+          p_tenant_id: selectedTenant.id
         });
 
       if (error) {
@@ -81,7 +81,12 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
       }));
     } catch (error) {
       console.error('Error fetching previous balance:', error);
-      // Fallback: hitung manual jika fungsi database gagal
+      toast({
+        title: "Warning",
+        description: "Gagal menghitung tunggakan, menggunakan perhitungan manual",
+        variant: "destructive"
+      });
+      // Fallback to manual calculation
       await calculateManualBalance();
     }
   };
@@ -92,7 +97,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
     try {
       console.log('Calculating manual balance for tenant:', selectedTenant.id);
       
-      // Hitung bulan yang sudah berlalu sejak check-in
+      // Calculate months passed since check-in
       const checkinDate = new Date(selectedTenant.checkin_date);
       const currentDate = new Date();
       const monthsPassed = (currentDate.getFullYear() - checkinDate.getFullYear()) * 12 + 
@@ -106,10 +111,10 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
         return;
       }
 
-      // Total yang seharusnya dibayar
+      // Total that should be paid
       const totalShouldPay = selectedTenant.monthly_rent * monthsPassed;
       
-      // Total yang sudah dibayar
+      // Total that has been paid
       const { data: payments, error: paymentsError } = await supabase
         .from('payments')
         .select('payment_amount')
@@ -177,11 +182,29 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
       return;
     }
 
+    if (!formData.paymentAmount || formData.paymentAmount <= 0) {
+      toast({
+        title: "Error",
+        description: "Masukkan jumlah pembayaran yang valid",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.paymentMethod) {
+      toast({
+        title: "Error",
+        description: "Pilih metode pembayaran",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       console.log('Submitting payment data:', formData);
       console.log('Calculation result:', calculationResult);
 
-      // Siapkan data pembayaran sesuai dengan schema database
+      // Prepare payment data according to database schema
       const paymentData = {
         tenant_id: selectedTenant.id,
         receipt_number: calculationResult.receiptNumber,
@@ -200,7 +223,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
 
       console.log('Inserting payment data:', paymentData);
 
-      // Insert pembayaran ke database
+      // Insert payment to database
       const { data: insertedData, error: insertError } = await supabase
         .from('payments')
         .insert([paymentData])
@@ -214,22 +237,27 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
 
       console.log('Payment inserted successfully:', insertedData);
 
-      // Update balance penghuni jika ada sisa tagihan
-      if (calculationResult.remainingBalance !== 0) {
-        try {
-          const { error: updateError } = await supabase
-            .rpc('update_tenant_balance', {
-              tenant_id: selectedTenant.id
-            });
+      // Update tenant balance using the fixed database function
+      try {
+        const { error: updateError } = await supabase
+          .rpc('update_tenant_balance', {
+            p_tenant_id: selectedTenant.id
+          });
 
-          if (updateError) {
-            console.error('Error updating tenant balance:', updateError);
-          } else {
-            console.log('Tenant balance updated successfully');
-          }
-        } catch (balanceError) {
-          console.error('Balance update error:', balanceError);
+        if (updateError) {
+          console.error('Error updating tenant balance:', updateError);
+          // Don't throw here, as the payment was already saved
+          toast({
+            title: "Warning",
+            description: "Pembayaran tersimpan tapi gagal update saldo. Silakan refresh halaman.",
+            variant: "default"
+          });
+        } else {
+          console.log('Tenant balance updated successfully');
         }
+      } catch (balanceError) {
+        console.error('Balance update error:', balanceError);
+        // Don't throw here, as the payment was already saved
       }
 
       toast({
@@ -238,14 +266,14 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
         variant: "default"
       });
 
-      // Callback untuk membuat kwitansi
+      // Callback to create receipt
       onPaymentSubmit(formData, calculationResult);
       resetForm();
 
     } catch (error: any) {
       console.error('Error saving payment:', error);
       
-      // Error handling yang lebih spesifik
+      // More specific error handling
       let errorMessage = "Gagal menyimpan pembayaran";
       if (error?.message?.includes('duplicate key')) {
         errorMessage = "Nomor kwitansi sudah ada, silakan coba lagi";
@@ -253,6 +281,8 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
         errorMessage = "Data penghuni tidak valid";
       } else if (error?.message?.includes('check constraint')) {
         errorMessage = "Data pembayaran tidak valid";
+      } else if (error?.message?.includes('violates row-level security')) {
+        errorMessage = "Tidak memiliki akses untuk menyimpan data";
       } else if (error?.message) {
         errorMessage = `Gagal menyimpan pembayaran: ${error.message}`;
       }
