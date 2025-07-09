@@ -48,6 +48,55 @@ export default function PaymentCalculation({
     }
   };
 
+  // Generate outstanding balance description
+  const getOutstandingDescription = () => {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth() + 1;
+    const currentYear = currentDate.getFullYear();
+    
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    
+    let description = '';
+    
+    // Calculate how many months of rent are included
+    const monthsCount = Math.ceil(previousBalance / rentAmount);
+    
+    if (monthsCount > 1) {
+      // Show breakdown of months
+      const startMonth = currentMonth - monthsCount + 1;
+      const months = [];
+      
+      for (let i = 0; i < monthsCount; i++) {
+        let monthIndex = startMonth + i - 1;
+        let year = currentYear;
+        
+        if (monthIndex < 0) {
+          monthIndex += 12;
+          year -= 1;
+        } else if (monthIndex >= 12) {
+          monthIndex -= 12;
+          year += 1;
+        }
+        
+        months.push(monthNames[monthIndex]);
+      }
+      
+      if (months.length > 1) {
+        const lastMonth = months.pop();
+        description = `Akumulasi sewa ${months.join(' + ')} + ${lastMonth}`;
+      } else {
+        description = `Sewa ${months[0]}`;
+      }
+    } else {
+      description = `Sewa ${monthNames[currentMonth - 1]} ${currentYear}`;
+    }
+    
+    return description;
+  };
+
   return (
     <Card className="bg-muted/50 border-primary/20">
       <CardContent className="pt-6">
@@ -63,16 +112,17 @@ export default function PaymentCalculation({
         </div>
         
         <div className="space-y-4">
-          {/* Rincian Tagihan */}
+          {/* Rincian Tagihan - Only show Tunggakan Sebelumnya */}
           <div className="bg-white/50 p-4 rounded-lg border">
             <h4 className="font-medium text-sm text-muted-foreground mb-3">RINCIAN TAGIHAN</h4>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Sewa Bulan Ini:</span>
-                <span className="font-medium">{formatCurrency(rentAmount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Tunggakan Sebelumnya:</span>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <span className="font-medium text-stone-800">Tunggakan Sebelumnya:</span>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {getOutstandingDescription()}
+                  </p>
+                </div>
                 <span className={`font-medium ${previousBalance > 0 ? 'text-warning' : 'text-muted-foreground'}`}>
                   {formatCurrency(previousBalance)}
                 </span>

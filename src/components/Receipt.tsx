@@ -26,32 +26,33 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
 
     try {
       const canvas = await html2canvas(element, {
-        scale: 1.5,
+        scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
-        width: 595, // A4 width in pixels at 72 DPI
-        height: 842 // A4 height in pixels at 72 DPI
+        logging: false,
+        scrollX: 0,
+        scrollY: 0
       });
       
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
       
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      // Scale to fit A4 with some margin
+      // Calculate dimensions to fit content
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
-      const ratio = Math.min((pdfWidth - 20) / (imgWidth * 0.264583), (pdfHeight - 20) / (imgHeight * 0.264583));
+      const aspectRatio = imgHeight / imgWidth;
       
-      const scaledWidth = imgWidth * 0.264583 * ratio;
-      const scaledHeight = imgHeight * 0.264583 * ratio;
+      // Use actual content dimensions with some margin
+      const pdfWidth = Math.min(imgWidth * 0.264583 + 20, 210); // Max A4 width
+      const pdfHeight = pdfWidth * aspectRatio;
       
-      const x = (pdfWidth - scaledWidth) / 2;
-      const y = 10;
+      const pdf = new jsPDF({
+        orientation: pdfHeight > pdfWidth ? 'portrait' : 'landscape',
+        unit: 'mm',
+        format: [pdfWidth, pdfHeight]
+      });
       
-      pdf.addImage(imgData, 'PNG', x, y, scaledWidth, scaledHeight);
+      pdf.addImage(imgData, 'PNG', 10, 10, pdfWidth - 20, pdfHeight - 20);
       pdf.save(`kwitansi-${paymentResult.receiptNumber}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -69,6 +70,44 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
         return <Badge className="bg-blue-600 text-white hover:bg-blue-700">LEBIH BAYAR</Badge>;
       default:
         return null;
+    }
+  };
+
+  // Generate outstanding balance description for receipt
+  const getOutstandingDescription = () => {
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth() + 1;
+    const currentYear = currentDate.getFullYear();
+    
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    
+    const monthsCount = Math.ceil(paymentData.previousBalance / paymentData.rentAmount);
+    
+    if (monthsCount > 1) {
+      const startMonth = currentMonth - monthsCount + 1;
+      const months = [];
+      
+      for (let i = 0; i < monthsCount; i++) {
+        let monthIndex = startMonth + i - 1;
+        if (monthIndex < 0) {
+          monthIndex += 12;
+        } else if (monthIndex >= 12) {
+          monthIndex -= 12;
+        }
+        months.push(monthNames[monthIndex]);
+      }
+      
+      if (months.length > 1) {
+        const lastMonth = months.pop();
+        return `Akumulasi sewa ${months.join(' + ')} + ${lastMonth}`;
+      } else {
+        return `Sewa ${months[0]}`;
+      }
+    } else {
+      return `Sewa ${monthNames[currentMonth - 1]} ${currentYear}`;
     }
   };
 
@@ -92,24 +131,24 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
         </div>
       </div>
 
-      {/* Receipt - Optimized for A4 single page */}
-      <Card id="receipt-content" className="bg-white border-2 border-stone-200 shadow-lg print:shadow-none print:border-2 max-w-[190mm] mx-auto">
-        <CardContent className="p-6 print:p-4 relative">
+      {/* Receipt - Optimized for auto-sizing */}
+      <Card id="receipt-content" className="bg-white border-2 border-stone-200 shadow-lg print:shadow-none print:border-2 max-w-[180mm] mx-auto">
+        <CardContent className="p-5 print:p-4 relative">
           {/* Header with Logo - Compact */}
-          <div className="text-center space-y-2 mb-4">
-            <div className="flex justify-center mb-2">
+          <div className="text-center space-y-2 mb-3">
+            <div className="flex justify-center mb-1">
               <img 
                 src="/lovable-uploads/3da050e2-be00-4460-9d02-c768ffe65c14.png" 
                 alt="ANTIEQ WISMA KOST Logo" 
-                className="h-16 w-auto object-contain"
+                className="h-12 w-auto object-contain"
               />
             </div>
             
-            <h1 className="text-2xl font-bold text-stone-800">ANTIEQ WISMA KOST</h1>
+            <h1 className="text-xl font-bold text-stone-800">ANTIEQ WISMA KOST</h1>
             <div className="text-stone-700 space-y-1">
-              <p className="text-sm font-medium">JL. Drs HASAN KADIR desa BUTU kec TILONGKABILA</p>
-              <p className="text-sm font-medium">BONEBOLANGO GORONTALO</p>
-              <div className="grid grid-cols-2 gap-2 text-xs mt-2">
+              <p className="text-xs font-medium">JL. Drs HASAN KADIR desa BUTU kec TILONGKABILA</p>
+              <p className="text-xs font-medium">BONEBOLANGO GORONTALO</p>
+              <div className="grid grid-cols-2 gap-2 text-xs mt-1">
                 <div className="space-y-0.5">
                   <p><strong>Telp:</strong> 0821 8753 5727</p>
                   <p><strong>Email:</strong> info@antieqwisma.com</p>
@@ -121,12 +160,12 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
               </div>
             </div>
             <Separator className="my-2 bg-stone-300" />
-            <h2 className="text-xl font-bold text-stone-800">KWITANSI PEMBAYARAN</h2>
+            <h2 className="text-lg font-bold text-stone-800">KWITANSI PEMBAYARAN</h2>
           </div>
 
           {/* Receipt Details - Compact */}
-          <div className="grid grid-cols-2 gap-4 mb-3">
-            <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="space-y-1.5">
               <div>
                 <p className="text-xs text-stone-600">No. Kwitansi</p>
                 <p className="text-sm font-bold text-stone-800">{paymentResult.receiptNumber}</p>
@@ -141,7 +180,7 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div>
                 <p className="text-xs text-stone-600">Nomor Kamar</p>
                 <p className="text-sm font-semibold text-stone-800">{paymentData.roomNumber}</p>
@@ -160,14 +199,14 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
           {/* Watermark positioned between Nama Penyewa and Status */}
           <div className="relative mb-3">
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-              <div className="text-3xl font-bold text-stone-300 transform rotate-12 tracking-wider text-center opacity-40">
+              <div className="text-2xl font-bold text-stone-300 transform rotate-12 tracking-wider text-center opacity-30">
                 ANTIEQ WISMA<br />
-                <span className="text-lg">MANAJEMEN</span>
+                <span className="text-sm">MANAJEMEN</span>
               </div>
             </div>
             
             {/* Status Pembayaran */}
-            <div className="relative z-20 text-center py-4">
+            <div className="relative z-20 text-center py-3">
               <div className="space-y-1">
                 <p className="text-xs text-stone-600">Status Pembayaran</p>
                 <div className="flex justify-center">
@@ -179,32 +218,24 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
 
           <Separator className="my-3 bg-stone-300" />
 
-          {/* Detailed Payment Breakdown - Compact */}
+          {/* Detailed Payment Breakdown - Updated to show only Tunggakan */}
           <div className="space-y-3 mb-3">
-            <h3 className="text-lg font-bold text-stone-800">RINCIAN PEMBAYARAN</h3>
+            <h3 className="text-base font-bold text-stone-800">RINCIAN PEMBAYARAN</h3>
             
             <div className="bg-stone-50 p-3 rounded-lg border border-stone-200">
               <div className="space-y-2 text-sm">
-                {/* Current Month Rent */}
-                <div className="flex justify-between items-center py-1 border-b border-stone-200">
-                  <div>
-                    <span className="font-medium text-stone-800">Sewa Bulan {paymentData.month} {paymentData.year}</span>
+                {/* Only Tunggakan Sebelumnya */}
+                <div className="flex justify-between items-start py-1 border-b border-stone-200">
+                  <div className="flex-1">
+                    <span className="font-medium text-stone-800">Tunggakan Sebelumnya</span>
+                    <p className="text-xs text-stone-600 mt-1">
+                      {getOutstandingDescription()}
+                    </p>
                   </div>
-                  <span className="font-semibold text-stone-800">{formatCurrency(paymentData.rentAmount)}</span>
+                  <span className="font-semibold text-amber-700">{formatCurrency(paymentData.previousBalance)}</span>
                 </div>
                 
-                {/* Outstanding Balance */}
-                {paymentData.previousBalance > 0 && (
-                  <div className="flex justify-between items-center py-1 border-b border-stone-200">
-                    <div>
-                      <span className="font-medium text-amber-700">Tunggakan Sebelumnya</span>
-                      <p className="text-xs text-stone-600">Sisa kurang bayar bulan sebelumnya</p>
-                    </div>
-                    <span className="font-semibold text-amber-700">{formatCurrency(paymentData.previousBalance)}</span>
-                  </div>
-                )}
-                
-                {/* Subtotal */}
+                {/* Total Tagihan = Tunggakan Sebelumnya */}
                 <div className="flex justify-between items-center py-1 bg-stone-100 px-2 rounded">
                   <span className="font-bold text-stone-800">TOTAL TAGIHAN</span>
                   <span className="font-bold text-lg text-stone-800">{formatCurrency(paymentResult.totalDue)}</span>
@@ -229,7 +260,7 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
                 {/* Payment Amount */}
                 <div className="flex justify-between items-center py-2 bg-blue-50 px-2 rounded-lg border border-blue-200">
                   <span className="font-bold text-blue-800">Jumlah Yang Dibayar</span>
-                  <span className="font-bold text-xl text-blue-800">{formatCurrency(paymentData.paymentAmount)}</span>
+                  <span className="font-bold text-lg text-blue-800">{formatCurrency(paymentData.paymentAmount)}</span>
                 </div>
                 
                 {/* Remaining Balance or Overpayment */}
@@ -257,7 +288,7 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
           <div className="mb-3">
             <p className="text-xs text-stone-600 mb-1">Terbilang (Jumlah Dibayar):</p>
             <div className="border border-stone-300 rounded p-2 bg-stone-50">
-              <p className="text-sm font-semibold italic capitalize text-stone-800">
+              <p className="text-xs font-semibold italic capitalize text-stone-800">
                 {numberToWords(paymentData.paymentAmount)}
               </p>
             </div>
@@ -267,10 +298,10 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
 
           {/* Summary Box - Compact */}
           {paymentResult.remainingBalance !== 0 && (
-            <div className={`mb-3 p-3 rounded-lg border-2 ${
+            <div className={`mb-3 p-2 rounded-lg border-2 ${
               paymentResult.remainingBalance > 0 ? 'border-amber-400 bg-amber-50' : 'border-green-400 bg-green-50'
             }`}>
-              <h4 className="font-bold mb-1 text-sm text-stone-800">INFORMASI PEMBAYARAN:</h4>
+              <h4 className="font-bold mb-1 text-xs text-stone-800">INFORMASI PEMBAYARAN:</h4>
               {paymentResult.remainingBalance > 0 ? (
                 <div className="space-y-1 text-xs text-stone-700">
                   <p>• Status: <strong className="text-amber-700">KURANG BAYAR</strong></p>
@@ -288,8 +319,8 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
           )}
 
           {/* Footer - Compact */}
-          <div className="grid grid-cols-2 gap-4 text-xs">
-            <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="space-y-1">
               <p className="font-semibold text-stone-600">Catatan Penting:</p>
               <ul className="space-y-0.5 text-stone-600">
                 <li>• Kwitansi resmi sebagai bukti pembayaran</li>
@@ -303,13 +334,13 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
               </ul>
             </div>
             
-            <div className="text-center space-y-8">
+            <div className="text-center space-y-6">
               <div>
                 <p className="text-xs text-stone-600 mb-1">Gorontalo, {formatDate(paymentResult.paymentDate)}</p>
                 <p className="text-xs text-stone-600">Pengelola Kost</p>
               </div>
               <div>
-                <p className="font-bold text-stone-800 border-t border-stone-400 pt-1 inline-block min-w-24 text-sm">
+                <p className="font-bold text-stone-800 border-t border-stone-400 pt-1 inline-block min-w-20 text-xs">
                   ANTIEQ WISMA
                 </p>
               </div>
@@ -317,7 +348,7 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
           </div>
 
           {/* Bottom Footer */}
-          <div className="mt-4 pt-2 border-t border-stone-300 text-center">
+          <div className="mt-3 pt-2 border-t border-stone-300 text-center">
             <p className="text-xs font-bold text-stone-800">
               ANTIEQ WISMA KOST - Sistem Pembayaran Terintegrasi
             </p>
