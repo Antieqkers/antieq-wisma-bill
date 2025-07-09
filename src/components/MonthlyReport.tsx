@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,11 +10,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Payment, Tenant } from "@/lib/supabaseTypes";
-import { formatCurrency, formatDate } from "@/lib/paymentCalculator";
+import { formatCurrency } from "@/lib/paymentCalculator";
 
 interface PaymentWithTenant extends Payment {
   tenants: Tenant;
 }
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('id-ID');
+};
 
 export default function MonthlyReport() {
   const [payments, setPayments] = useState<PaymentWithTenant[]>([]);
@@ -195,7 +198,7 @@ export default function MonthlyReport() {
       ['Tanggal', 'No. Kwitansi', 'Nama', 'Kamar', 'Bulan', 'Tahun', 'Tarif Sewa', 'Tunggakan', 'Diskon', 'Dibayar', 'Sisa', 'Status', 'Metode'].join(','),
       // Data
       ...payments.map(payment => [
-        new Date(payment.payment_date).toLocaleDateString('id-ID'),
+        formatDate(payment.payment_date),
         payment.receipt_number,
         payment.tenants.name,
         payment.tenants.room_number,
@@ -320,7 +323,7 @@ export default function MonthlyReport() {
               <TableBody>
                 {payments.map((payment) => (
                   <TableRow key={payment.id}>
-                    <TableCell>{new Date(payment.payment_date).toLocaleDateString('id-ID')}</TableCell>
+                    <TableCell>{formatDate(payment.payment_date)}</TableCell>
                     <TableCell className="font-mono text-sm">{payment.receipt_number}</TableCell>
                     <TableCell className="font-medium">{payment.tenants.name}</TableCell>
                     <TableCell>

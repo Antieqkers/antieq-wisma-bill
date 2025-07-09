@@ -1,9 +1,9 @@
 
 import { useState } from "react";
-import { Building2, Users, CreditCard, FileText, Receipt, BarChart3 } from "lucide-react";
+import { Building2, Users, CreditCard, FileText, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PaymentForm from "@/components/PaymentForm";
-import Receipt from "@/components/Receipt";
+import ReceiptComponent from "@/components/Receipt";
 import TenantManagement from "@/components/TenantManagement";
 import MonthlyReport from "@/components/MonthlyReport";
 import ExpenseManager from "@/components/ExpenseManager";
@@ -100,7 +100,7 @@ const Index = () => {
               onClick={() => setCurrentView("expenses")}
               className="flex items-center gap-2"
             >
-              <Receipt className="h-4 w-4" />
+              <FileText className="h-4 w-4" />
               Pengeluaran
             </Button>
             <Button
@@ -142,7 +142,7 @@ const Index = () => {
                 Kwitansi resmi pembayaran sewa kamar ANTIEQ WISMA KOST
               </p>
             </div>
-            <Receipt 
+            <ReceiptComponent 
               paymentData={paymentData} 
               paymentResult={paymentResult} 
               onBack={handleBackToForm}

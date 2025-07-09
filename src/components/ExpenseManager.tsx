@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency, formatDate } from "@/lib/paymentCalculator";
+import { formatCurrency } from "@/lib/paymentCalculator";
 
 interface Expense {
   id: string;
@@ -34,6 +33,10 @@ const expenseCategories = [
   'Pembelian Peralatan',
   'Lainnya'
 ];
+
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('id-ID');
+};
 
 export default function ExpenseManager() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
