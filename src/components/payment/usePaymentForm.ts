@@ -63,28 +63,44 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
     try {
       console.log('Calculating outstanding balance for tenant:', selectedTenant.id, selectedTenant.name);
       
-      // Calculate total rent that should have been paid
-      const checkinDate = new Date(selectedTenant.checkin_date);
+      // Get current system date
       const currentDate = new Date();
+      const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-based
+      const currentYear = currentDate.getFullYear();
       
-      // Calculate months passed since check-in
-      const yearsDiff = currentDate.getFullYear() - checkinDate.getFullYear();
-      const monthsDiff = currentDate.getMonth() - checkinDate.getMonth();
-      const totalMonthsPassed = (yearsDiff * 12) + monthsDiff;
+      console.log('Current system date:', currentMonth, currentYear);
       
-      console.log('Months passed since checkin:', totalMonthsPassed);
-      console.log('Monthly rent:', selectedTenant.monthly_rent);
+      // Calculate total rent that should have been paid up to current month
+      const checkinDate = new Date(selectedTenant.checkin_date);
+      const checkinMonth = checkinDate.getMonth() + 1;
+      const checkinYear = checkinDate.getFullYear();
       
-      if (totalMonthsPassed < 1) {
+      console.log('Checkin date:', checkinMonth, checkinYear);
+      
+      // Calculate months passed from checkin to current month
+      let monthsPassed = 0;
+      if (currentYear === checkinYear) {
+        monthsPassed = Math.max(currentMonth - checkinMonth + 1, 0);
+      } else {
+        // Months in checkin year + months in years between + months in current year
+        const monthsInCheckinYear = 12 - checkinMonth + 1;
+        const yearsBetween = currentYear - checkinYear - 1;
+        const monthsInCurrentYear = currentMonth;
+        monthsPassed = monthsInCheckinYear + (yearsBetween * 12) + monthsInCurrentYear;
+      }
+      
+      console.log('Months passed since checkin to current month:', monthsPassed);
+      
+      if (monthsPassed < 1) {
         console.log('Less than 1 month passed, no outstanding balance');
         setPreviousBalance(0);
         setFormData(prev => ({ ...prev, previousBalance: 0 }));
         return;
       }
 
-      // Calculate total amount that should have been paid
-      const totalShouldPay = selectedTenant.monthly_rent * totalMonthsPassed;
-      console.log('Total should pay (rent × months):', totalShouldPay);
+      // Calculate total amount that should have been paid up to current month
+      const totalShouldPay = selectedTenant.monthly_rent * monthsPassed;
+      console.log('Total should pay up to current month (rent × months):', totalShouldPay);
 
       // Get all payments made by this tenant
       const { data: payments, error: paymentsError } = await supabase
@@ -119,22 +135,21 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
 
       console.log('Total paid by tenant:', totalPaid);
 
-      // Calculate outstanding balance
-      // If there's a positive remaining balance from latest payment, use that
-      // Otherwise calculate based on total owed vs total paid
+      // Calculate outstanding balance based on what should be paid vs what was paid
+      // Previous balance = sisa kurang bayar sewa bulan sebelumnya
       let outstandingBalance = 0;
       
       if (latestRemainingBalance > 0) {
-        // Use the remaining balance from the latest payment
+        // Use the remaining balance from the latest payment (sisa kurang bayar terakhir)
         outstandingBalance = latestRemainingBalance;
-        console.log('Using latest remaining balance:', outstandingBalance);
+        console.log('Using latest remaining balance as previous balance:', outstandingBalance);
       } else {
-        // Calculate manually: total owed - total paid
+        // Calculate manually: total that should be paid up to current month - total paid
         outstandingBalance = Math.max(totalShouldPay - totalPaid, 0);
-        console.log('Calculated outstanding balance:', outstandingBalance);
+        console.log('Calculated outstanding balance up to current month:', outstandingBalance);
       }
 
-      console.log('Final calculated outstanding balance:', outstandingBalance);
+      console.log('Final calculated previous balance (sisa kurang bayar):', outstandingBalance);
       
       setPreviousBalance(outstandingBalance);
       setFormData(prev => ({
@@ -161,13 +176,27 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
     try {
       console.log('Performing manual balance calculation for tenant:', selectedTenant.id);
       
-      // Calculate months passed since check-in
-      const checkinDate = new Date(selectedTenant.checkin_date);
+      // Get current system date for calculation limit
       const currentDate = new Date();
-      const monthsPassed = (currentDate.getFullYear() - checkinDate.getFullYear()) * 12 + 
-                          (currentDate.getMonth() - checkinDate.getMonth());
+      const currentMonth = currentDate.getMonth() + 1;
+      const currentYear = currentDate.getFullYear();
       
-      console.log('Manual calculation - Months passed:', monthsPassed);
+      // Calculate months passed from checkin to current month only
+      const checkinDate = new Date(selectedTenant.checkin_date);
+      const checkinMonth = checkinDate.getMonth() + 1;
+      const checkinYear = checkinDate.getFullYear();
+      
+      let monthsPassed = 0;
+      if (currentYear === checkinYear) {
+        monthsPassed = Math.max(currentMonth - checkinMonth + 1, 0);
+      } else {
+        const monthsInCheckinYear = 12 - checkinMonth + 1;
+        const yearsBetween = currentYear - checkinYear - 1;
+        const monthsInCurrentYear = currentMonth;
+        monthsPassed = monthsInCheckinYear + (yearsBetween * 12) + monthsInCurrentYear;
+      }
+      
+      console.log('Manual calculation - Months passed to current month:', monthsPassed);
       
       if (monthsPassed < 1) {
         setPreviousBalance(0);
@@ -175,9 +204,9 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
         return;
       }
 
-      // Total that should be paid
+      // Total that should be paid up to current month
       const totalShouldPay = selectedTenant.monthly_rent * monthsPassed;
-      console.log('Manual calculation - Total should pay:', totalShouldPay);
+      console.log('Manual calculation - Total should pay up to current month:', totalShouldPay);
       
       // Total that has been paid
       const { data: payments, error: paymentsError } = await supabase
@@ -193,7 +222,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
       const totalPaid = payments?.reduce((sum, payment) => sum + (payment.payment_amount || 0), 0) || 0;
       const outstanding = Math.max(totalShouldPay - totalPaid, 0);
       
-      console.log('Manual calculation - Total paid:', totalPaid, 'Outstanding:', outstanding);
+      console.log('Manual calculation - Total paid:', totalPaid, 'Outstanding up to current month:', outstanding);
       
       setPreviousBalance(outstanding);
       setFormData(prev => ({
