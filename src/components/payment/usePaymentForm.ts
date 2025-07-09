@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -56,37 +55,102 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
   };
 
   const fetchPreviousBalance = async () => {
-    if (!selectedTenant) return;
+    if (!selectedTenant) {
+      console.log('No selected tenant, skipping balance calculation');
+      return;
+    }
 
     try {
-      console.log('Calculating previous balance for tenant:', selectedTenant.id);
+      console.log('Calculating outstanding balance for tenant:', selectedTenant.id, selectedTenant.name);
       
-      // Use the fixed database function to calculate outstanding balance
-      const { data, error } = await supabase
-        .rpc('calculate_outstanding_balance', {
-          p_tenant_id: selectedTenant.id
-        });
-
-      if (error) {
-        console.error('Error calculating balance:', error);
-        throw error;
+      // Calculate total rent that should have been paid
+      const checkinDate = new Date(selectedTenant.checkin_date);
+      const currentDate = new Date();
+      
+      // Calculate months passed since check-in
+      const yearsDiff = currentDate.getFullYear() - checkinDate.getFullYear();
+      const monthsDiff = currentDate.getMonth() - checkinDate.getMonth();
+      const totalMonthsPassed = (yearsDiff * 12) + monthsDiff;
+      
+      console.log('Months passed since checkin:', totalMonthsPassed);
+      console.log('Monthly rent:', selectedTenant.monthly_rent);
+      
+      if (totalMonthsPassed < 1) {
+        console.log('Less than 1 month passed, no outstanding balance');
+        setPreviousBalance(0);
+        setFormData(prev => ({ ...prev, previousBalance: 0 }));
+        return;
       }
+
+      // Calculate total amount that should have been paid
+      const totalShouldPay = selectedTenant.monthly_rent * totalMonthsPassed;
+      console.log('Total should pay (rent × months):', totalShouldPay);
+
+      // Get all payments made by this tenant
+      const { data: payments, error: paymentsError } = await supabase
+        .from('payments')
+        .select('payment_amount, remaining_balance, payment_date, period_month, period_year')
+        .eq('tenant_id', selectedTenant.id)
+        .order('payment_date', { ascending: true });
+
+      if (paymentsError) {
+        console.error('Error fetching payments:', paymentsError);
+        throw paymentsError;
+      }
+
+      console.log('Payments found:', payments);
+
+      let totalPaid = 0;
+      let latestRemainingBalance = 0;
+
+      if (payments && payments.length > 0) {
+        // Sum all payments made
+        totalPaid = payments.reduce((sum, payment) => {
+          console.log('Payment amount:', payment.payment_amount);
+          return sum + (payment.payment_amount || 0);
+        }, 0);
+
+        // Get the latest remaining balance from the most recent payment
+        const latestPayment = payments[payments.length - 1];
+        latestRemainingBalance = latestPayment.remaining_balance || 0;
+        
+        console.log('Latest payment remaining balance:', latestRemainingBalance);
+      }
+
+      console.log('Total paid by tenant:', totalPaid);
+
+      // Calculate outstanding balance
+      // If there's a positive remaining balance from latest payment, use that
+      // Otherwise calculate based on total owed vs total paid
+      let outstandingBalance = 0;
       
-      console.log('Calculated balance:', data);
-      const balance = data || 0;
-      setPreviousBalance(balance);
+      if (latestRemainingBalance > 0) {
+        // Use the remaining balance from the latest payment
+        outstandingBalance = latestRemainingBalance;
+        console.log('Using latest remaining balance:', outstandingBalance);
+      } else {
+        // Calculate manually: total owed - total paid
+        outstandingBalance = Math.max(totalShouldPay - totalPaid, 0);
+        console.log('Calculated outstanding balance:', outstandingBalance);
+      }
+
+      console.log('Final calculated outstanding balance:', outstandingBalance);
+      
+      setPreviousBalance(outstandingBalance);
       setFormData(prev => ({
         ...prev,
-        previousBalance: balance
+        previousBalance: outstandingBalance
       }));
+
     } catch (error) {
-      console.error('Error fetching previous balance:', error);
+      console.error('Error calculating outstanding balance:', error);
       toast({
         title: "Warning",
         description: "Gagal menghitung tunggakan, menggunakan perhitungan manual",
         variant: "destructive"
       });
-      // Fallback to manual calculation
+      
+      // Fallback calculation
       await calculateManualBalance();
     }
   };
@@ -95,7 +159,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
     if (!selectedTenant) return;
 
     try {
-      console.log('Calculating manual balance for tenant:', selectedTenant.id);
+      console.log('Performing manual balance calculation for tenant:', selectedTenant.id);
       
       // Calculate months passed since check-in
       const checkinDate = new Date(selectedTenant.checkin_date);
@@ -103,7 +167,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
       const monthsPassed = (currentDate.getFullYear() - checkinDate.getFullYear()) * 12 + 
                           (currentDate.getMonth() - checkinDate.getMonth());
       
-      console.log('Months passed since checkin:', monthsPassed);
+      console.log('Manual calculation - Months passed:', monthsPassed);
       
       if (monthsPassed < 1) {
         setPreviousBalance(0);
@@ -113,6 +177,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
 
       // Total that should be paid
       const totalShouldPay = selectedTenant.monthly_rent * monthsPassed;
+      console.log('Manual calculation - Total should pay:', totalShouldPay);
       
       // Total that has been paid
       const { data: payments, error: paymentsError } = await supabase
@@ -121,14 +186,14 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
         .eq('tenant_id', selectedTenant.id);
 
       if (paymentsError) {
-        console.error('Error fetching payments:', paymentsError);
+        console.error('Error fetching payments for manual calculation:', paymentsError);
         throw paymentsError;
       }
 
-      const totalPaid = payments?.reduce((sum, payment) => sum + payment.payment_amount, 0) || 0;
+      const totalPaid = payments?.reduce((sum, payment) => sum + (payment.payment_amount || 0), 0) || 0;
       const outstanding = Math.max(totalShouldPay - totalPaid, 0);
       
-      console.log('Manual calculation - Should pay:', totalShouldPay, 'Paid:', totalPaid, 'Outstanding:', outstanding);
+      console.log('Manual calculation - Total paid:', totalPaid, 'Outstanding:', outstanding);
       
       setPreviousBalance(outstanding);
       setFormData(prev => ({
@@ -145,18 +210,21 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
   const handleTenantChange = (tenantId: string) => {
     const tenant = tenants.find(t => t.id === tenantId);
     if (tenant) {
+      console.log('Selected tenant changed to:', tenant.name, 'Room:', tenant.room_number);
       setSelectedTenant(tenant);
       setFormData(prev => ({
         ...prev,
         tenant_id: tenantId,
         tenantName: tenant.name,
         roomNumber: tenant.room_number,
-        rentAmount: tenant.monthly_rent
+        rentAmount: tenant.monthly_rent,
+        previousBalance: 0 // Reset previous balance, will be calculated in useEffect
       }));
     }
   };
 
   const handleInputChange = (field: keyof PaymentFormData, value: string | number) => {
+    console.log('Input changed:', field, value);
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -164,6 +232,7 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
   };
 
   const resetForm = () => {
+    console.log('Resetting form');
     setFormData(createInitialFormData());
     setSelectedTenant(null);
     setPreviousBalance(0);
