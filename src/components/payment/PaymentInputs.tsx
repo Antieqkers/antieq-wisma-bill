@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Info, Calculator } from "lucide-react";
 import { formatCurrency } from "@/lib/paymentCalculator";
 
 interface PaymentInputsProps {
@@ -61,18 +61,23 @@ export default function PaymentInputs({
           />
           <div className="text-xs space-y-1">
             {previousBalance > 0 ? (
-              <p className="text-warning flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                Akumulasi tunggakan dari semua periode sebelumnya
-              </p>
+              <div className="space-y-1">
+                <p className="text-warning flex items-center gap-1">
+                  <Calculator className="h-3 w-3" />
+                  Akumulasi semua sewa dari check-in sampai bulan aktif sistem
+                </p>
+                <p className="text-muted-foreground bg-amber-50 p-2 rounded border border-amber-200">
+                  <strong>Rumus:</strong> (Sewa Bulanan × Jumlah Bulan) - Total Yang Sudah Dibayar
+                </p>
+              </div>
             ) : (
               <p className="text-success flex items-center gap-1">
                 <Info className="h-3 w-3" />
-                Tidak ada tunggakan - semua pembayaran up to date
+                Tidak ada tunggakan - pembayaran up to date
               </p>
             )}
             <p className="text-muted-foreground">
-              *Dihitung otomatis berdasarkan riwayat pembayaran sejak check-in
+              *Dihitung otomatis berdasarkan kalender sistem yang aktif
             </p>
           </div>
         </div>
@@ -90,9 +95,21 @@ export default function PaymentInputs({
             placeholder="Masukkan jumlah pembayaran"
             required
           />
-          <p className="text-xs text-muted-foreground">
-            Jumlah uang yang diterima dari penghuni
-          </p>
+          <div className="text-xs space-y-1">
+            <p className="text-muted-foreground">
+              Jumlah uang yang diterima dari penghuni
+            </p>
+            {paymentAmount > 0 && rentAmount > 0 && (
+              <div className="bg-blue-50 p-2 rounded border border-blue-200">
+                <p className="text-blue-700 font-medium">
+                  Sisa dari pembayaran ini: {formatCurrency(Math.max(rentAmount - paymentAmount, 0))}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  *Sisa ini akan menjadi tunggakan bulan berikutnya jika tidak lunas
+                </p>
+              </div>
+            )}
+          </div>
         </div>
         
         <div className="space-y-2">

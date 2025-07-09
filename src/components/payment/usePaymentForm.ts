@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -77,30 +78,30 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
       
       console.log('Checkin date:', checkinMonth, checkinYear);
       
-      // Calculate months passed from checkin to current month
-      let monthsPassed = 0;
+      // Calculate months from checkin to current month (sistem calendar aktif)
+      let monthsFromCheckinToCurrent = 0;
       if (currentYear === checkinYear) {
-        monthsPassed = Math.max(currentMonth - checkinMonth + 1, 0);
+        monthsFromCheckinToCurrent = Math.max(currentMonth - checkinMonth + 1, 0);
       } else {
         // Months in checkin year + months in years between + months in current year
         const monthsInCheckinYear = 12 - checkinMonth + 1;
         const yearsBetween = currentYear - checkinYear - 1;
         const monthsInCurrentYear = currentMonth;
-        monthsPassed = monthsInCheckinYear + (yearsBetween * 12) + monthsInCurrentYear;
+        monthsFromCheckinToCurrent = monthsInCheckinYear + (yearsBetween * 12) + monthsInCurrentYear;
       }
       
-      console.log('Months passed since checkin to current month:', monthsPassed);
+      console.log('Months from checkin to current month (sistem aktif):', monthsFromCheckinToCurrent);
       
-      if (monthsPassed < 1) {
+      if (monthsFromCheckinToCurrent < 1) {
         console.log('Less than 1 month passed, no outstanding balance');
         setPreviousBalance(0);
         setFormData(prev => ({ ...prev, previousBalance: 0 }));
         return;
       }
 
-      // Calculate total amount that should have been paid up to current month
-      const totalShouldPay = selectedTenant.monthly_rent * monthsPassed;
-      console.log('Total should pay up to current month (rent × months):', totalShouldPay);
+      // Calculate total amount that should have been paid from checkin to current month
+      const totalShouldPayToCurrent = selectedTenant.monthly_rent * monthsFromCheckinToCurrent;
+      console.log('Total should pay from checkin to current month:', totalShouldPayToCurrent);
 
       // Get all payments made by this tenant
       const { data: payments, error: paymentsError } = await supabase
@@ -117,39 +118,21 @@ export function usePaymentForm(onPaymentSubmit: (paymentData: PaymentFormData, r
       console.log('Payments found:', payments);
 
       let totalPaid = 0;
-      let latestRemainingBalance = 0;
-
       if (payments && payments.length > 0) {
         // Sum all payments made
         totalPaid = payments.reduce((sum, payment) => {
           console.log('Payment amount:', payment.payment_amount);
           return sum + (payment.payment_amount || 0);
         }, 0);
-
-        // Get the latest remaining balance from the most recent payment
-        const latestPayment = payments[payments.length - 1];
-        latestRemainingBalance = latestPayment.remaining_balance || 0;
-        
-        console.log('Latest payment remaining balance:', latestRemainingBalance);
       }
 
       console.log('Total paid by tenant:', totalPaid);
 
-      // Calculate outstanding balance based on what should be paid vs what was paid
-      // Previous balance = sisa kurang bayar sewa bulan sebelumnya
-      let outstandingBalance = 0;
+      // Calculate outstanding balance (tunggakan keseluruhan)
+      // = Total yang harus dibayar sampai bulan aktif sistem - Total yang sudah dibayar
+      const outstandingBalance = Math.max(totalShouldPayToCurrent - totalPaid, 0);
       
-      if (latestRemainingBalance > 0) {
-        // Use the remaining balance from the latest payment (sisa kurang bayar terakhir)
-        outstandingBalance = latestRemainingBalance;
-        console.log('Using latest remaining balance as previous balance:', outstandingBalance);
-      } else {
-        // Calculate manually: total that should be paid up to current month - total paid
-        outstandingBalance = Math.max(totalShouldPay - totalPaid, 0);
-        console.log('Calculated outstanding balance up to current month:', outstandingBalance);
-      }
-
-      console.log('Final calculated previous balance (sisa kurang bayar):', outstandingBalance);
+      console.log('Calculated outstanding balance (tunggakan keseluruhan sampai bulan aktif sistem):', outstandingBalance);
       
       setPreviousBalance(outstandingBalance);
       setFormData(prev => ({
