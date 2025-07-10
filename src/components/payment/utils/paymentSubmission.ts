@@ -13,6 +13,19 @@ export const submitPayment = async (
   console.log('Submitting payment data:', formData);
   console.log('Calculation result:', calculationResult);
 
+  // Prepare notes with transfer details if payment method is transfer
+  let notesText = description && description.trim() ? description.trim() : `Pembayaran sewa bulan ${formData.month} ${formData.year}`;
+  
+  if (formData.paymentMethod === 'transfer' && (formData.transferReference || formData.bankName)) {
+    const transferDetails = [];
+    if (formData.bankName) transferDetails.push(`Bank: ${formData.bankName}`);
+    if (formData.transferReference) transferDetails.push(`Ref: ${formData.transferReference}`);
+    
+    if (transferDetails.length > 0) {
+      notesText += ` | ${transferDetails.join(' | ')}`;
+    }
+  }
+
   // Prepare payment data according to database schema
   const paymentData = {
     tenant_id: selectedTenant.id,
@@ -27,7 +40,7 @@ export const submitPayment = async (
     remaining_balance: calculationResult.remainingBalance,
     payment_status: calculationResult.paymentStatus,
     payment_method: formData.paymentMethod,
-    notes: description && description.trim() ? description.trim() : `Pembayaran sewa bulan ${formData.month} ${formData.year}`
+    notes: notesText
   };
 
   console.log('Inserting payment data:', paymentData);

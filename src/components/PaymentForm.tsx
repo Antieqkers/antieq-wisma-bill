@@ -62,6 +62,8 @@ export default function PaymentForm({ onPaymentSubmit }: PaymentFormProps) {
                 paymentAmount={formData.paymentAmount}
                 discountAmount={formData.discountAmount}
                 paymentMethod={formData.paymentMethod}
+                transferReference={formData.transferReference}
+                bankName={formData.bankName}
                 description={description}
                 onInputChange={handleInputChange}
                 onDescriptionChange={setDescription}

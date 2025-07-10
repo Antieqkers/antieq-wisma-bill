@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, Info, Calculator } from "lucide-react";
+import { AlertTriangle, Info, Calculator, CreditCard } from "lucide-react";
 import { formatCurrency } from "@/lib/paymentCalculator";
 
 interface PaymentInputsProps {
@@ -12,6 +12,8 @@ interface PaymentInputsProps {
   paymentAmount: number;
   discountAmount: number;
   paymentMethod: string;
+  transferReference?: string;
+  bankName?: string;
   description: string;
   onInputChange: (field: string, value: string | number) => void;
   onDescriptionChange: (value: string) => void;
@@ -23,6 +25,8 @@ export default function PaymentInputs({
   paymentAmount,
   discountAmount,
   paymentMethod,
+  transferReference,
+  bankName,
   description,
   onInputChange,
   onDescriptionChange
@@ -141,6 +145,49 @@ export default function PaymentInputs({
           </SelectContent>
         </Select>
       </div>
+
+      {paymentMethod === 'transfer' && (
+        <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-2 text-blue-700 font-medium">
+            <CreditCard className="h-4 w-4" />
+            Detail Transfer Bank
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="bankName">Nama Bank</Label>
+              <Input
+                id="bankName"
+                type="text"
+                value={bankName || ''}
+                onChange={(e) => onInputChange("bankName", e.target.value)}
+                className="border-primary/20 focus:border-primary"
+                placeholder="Contoh: BCA, Mandiri, BRI"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Nama bank asal transfer
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="transferReference">Referensi/ID Transfer</Label>
+              <Input
+                id="transferReference"
+                type="text"
+                value={transferReference || ''}
+                onChange={(e) => onInputChange("transferReference", e.target.value)}
+                className="border-primary/20 focus:border-primary"
+                placeholder="Nomor referensi transfer"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Nomor referensi dari bukti transfer
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="description">Catatan Tambahan (Opsional)</Label>

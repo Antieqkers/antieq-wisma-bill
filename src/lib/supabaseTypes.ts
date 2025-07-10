@@ -25,6 +25,8 @@ export interface Payment {
   remaining_balance: number;
   payment_status: 'lunas' | 'kurang_bayar' | 'lebih_bayar';
   payment_method: 'cash' | 'transfer' | 'ewallet';
+  transfer_reference?: string;
+  bank_name?: string;
   notes?: string;
   description?: string;
   created_at?: string;
@@ -52,4 +54,6 @@ export interface PaymentFormData {
   paymentAmount: number;
   discountAmount: number;
   paymentMethod: 'cash' | 'transfer' | 'ewallet';
+  transferReference?: string;
+  bankName?: string;
 }

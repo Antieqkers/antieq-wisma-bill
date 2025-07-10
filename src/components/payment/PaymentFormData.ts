@@ -11,7 +11,9 @@ export const createInitialFormData = (): PaymentFormData => ({
   previousBalance: 0,
   paymentAmount: 0,
   discountAmount: 0,
-  paymentMethod: "cash"
+  paymentMethod: "cash",
+  transferReference: "",
+  bankName: ""
 });
 
 export const getMonthNumber = (monthName: string): number => {
