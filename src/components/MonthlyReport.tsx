@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,19 @@ interface PaymentWithTenant extends Payment {
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('id-ID');
+};
+
+// Helper function to extract transfer details from notes
+const extractTransferDetails = (notes: string | null) => {
+  if (!notes) return { bankName: '', transferReference: '' };
+  
+  const bankMatch = notes.match(/Bank:\s*([^|]+)/);
+  const refMatch = notes.match(/Ref:\s*([^|]+)/);
+  
+  return {
+    bankName: bankMatch ? bankMatch[1].trim() : '',
+    transferReference: refMatch ? refMatch[1].trim() : ''
+  };
 };
 
 export default function MonthlyReport() {
@@ -108,23 +122,29 @@ export default function MonthlyReport() {
   const exportToExcel = () => {
     const csvContent = [
       // Header
-      ['Tanggal', 'No. Kwitansi', 'Nama', 'Kamar', 'Bulan', 'Tahun', 'Tarif Sewa', 'Tunggakan', 'Diskon', 'Dibayar', 'Sisa', 'Status', 'Metode'].join(','),
+      ['Tanggal', 'No. Kwitansi', 'Nama', 'Kamar', 'Bulan', 'Tahun', 'Tarif Sewa', 'Tunggakan', 'Diskon', 'Dibayar', 'Sisa', 'Status', 'Metode', 'Bank', 'Ref Transfer', 'Catatan'].join(','),
       // Data
-      ...payments.map(payment => [
-        formatDate(payment.payment_date),
-        payment.receipt_number,
-        payment.tenants.name,
-        payment.tenants.room_number,
-        payment.period_month,
-        payment.period_year,
-        payment.rent_amount,
-        payment.previous_balance,
-        payment.discount_amount,
-        payment.payment_amount,
-        payment.remaining_balance,
-        payment.payment_status,
-        payment.payment_method
-      ].join(','))
+      ...payments.map(payment => {
+        const transferDetails = extractTransferDetails(payment.notes);
+        return [
+          formatDate(payment.payment_date),
+          payment.receipt_number,
+          payment.tenants.name,
+          payment.tenants.room_number,
+          payment.period_month,
+          payment.period_year,
+          payment.rent_amount,
+          payment.previous_balance,
+          payment.discount_amount,
+          payment.payment_amount,
+          payment.remaining_balance,
+          payment.payment_status,
+          payment.payment_method,
+          transferDetails.bankName,
+          transferDetails.transferReference,
+          payment.notes || ''
+        ].join(',')
+      })
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -374,59 +394,71 @@ export default function MonthlyReport() {
                   <TableHead>Dibayar</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Metode</TableHead>
+                  <TableHead>Transfer Info</TableHead>
                   <TableHead>Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {payments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>{formatDate(payment.payment_date)}</TableCell>
-                    <TableCell className="font-mono text-sm">{payment.receipt_number}</TableCell>
-                    <TableCell className="font-medium">{payment.tenants.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{payment.tenants.room_number}</Badge>
-                    </TableCell>
-                    <TableCell>{payment.period_month}/{payment.period_year}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(payment.payment_amount)}</TableCell>
-                    <TableCell>{getStatusBadge(payment.payment_status)}</TableCell>
-                    <TableCell className="capitalize">
-                      {payment.payment_method === 'cash' ? 'Tunai' : 
-                       payment.payment_method === 'transfer' ? 'Transfer' : 'E-Wallet'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditPayment(payment)}
-                          className="h-8 w-8 p-0"
-                          title="Edit"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeletePayment(payment.id)}
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                          title="Hapus"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => sendWhatsAppConfirmation(payment)}
-                          disabled={!payment.tenants.phone}
-                          className="h-8 w-8 p-0 text-green-600"
-                          title="Konfirmasi WhatsApp"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {payments.map((payment) => {
+                  const transferDetails = extractTransferDetails(payment.notes);
+                  return (
+                    <TableRow key={payment.id}>
+                      <TableCell>{formatDate(payment.payment_date)}</TableCell>
+                      <TableCell className="font-mono text-sm">{payment.receipt_number}</TableCell>
+                      <TableCell className="font-medium">{payment.tenants.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{payment.tenants.room_number}</Badge>
+                      </TableCell>
+                      <TableCell>{payment.period_month}/{payment.period_year}</TableCell>
+                      <TableCell className="font-medium">{formatCurrency(payment.payment_amount)}</TableCell>
+                      <TableCell>{getStatusBadge(payment.payment_status)}</TableCell>
+                      <TableCell className="capitalize">
+                        {payment.payment_method === 'cash' ? 'Tunai' : 
+                         payment.payment_method === 'transfer' ? 'Transfer' : 'E-Wallet'}
+                      </TableCell>
+                      <TableCell>
+                        {payment.payment_method === 'transfer' && (transferDetails.bankName || transferDetails.transferReference) ? (
+                          <div className="text-xs">
+                            {transferDetails.bankName && <div>Bank: {transferDetails.bankName}</div>}
+                            {transferDetails.transferReference && <div>Ref: {transferDetails.transferReference}</div>}
+                          </div>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditPayment(payment)}
+                            className="h-8 w-8 p-0"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeletePayment(payment.id)}
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                            title="Hapus"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => sendWhatsAppConfirmation(payment)}
+                            disabled={!payment.tenants.phone}
+                            className="h-8 w-8 p-0 text-green-600"
+                            title="Konfirmasi WhatsApp"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
