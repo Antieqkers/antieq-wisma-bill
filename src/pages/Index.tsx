@@ -1,17 +1,18 @@
 
 import { useState } from "react";
-import { Building2, Users, CreditCard, FileText, BarChart3 } from "lucide-react";
+import { Building2, Users, CreditCard, FileText, BarChart3, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PaymentForm from "@/components/PaymentForm";
 import ReceiptComponent from "@/components/Receipt";
 import TenantManagement from "@/components/TenantManagement";
 import MonthlyReport from "@/components/MonthlyReport";
+import TenantsArrearsReport from "@/components/reports/TenantsArrearsReport";
 import ExpenseManager from "@/components/ExpenseManager";
 import FinancialReport from "@/components/FinancialReport";
 import { PaymentFormData } from "@/lib/supabaseTypes";
 import { PaymentResult } from "@/lib/paymentCalculator";
 
-type ViewType = "form" | "receipt" | "tenants" | "reports" | "expenses" | "financial";
+type ViewType = "form" | "receipt" | "tenants" | "reports" | "arrears" | "expenses" | "financial";
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<ViewType>("form");
@@ -34,6 +35,7 @@ const Index = () => {
       case "receipt": return "Kwitansi Pembayaran";
       case "tenants": return "Manajemen Penghuni";
       case "reports": return "Laporan Bulanan";
+      case "arrears": return "Laporan Tunggakan";
       case "expenses": return "Manajemen Pengeluaran";
       case "financial": return "Laporan Keuangan";
       default: return "Input Pembayaran Sewa Kamar";
@@ -46,6 +48,7 @@ const Index = () => {
       case "receipt": return "Kwitansi resmi pembayaran sewa kamar ANTIEQ WISMA KOST";
       case "tenants": return "Kelola data penghuni kost";
       case "reports": return "Laporan transaksi pembayaran per bulan";
+      case "arrears": return "Laporan penghuni yang belum membayar atau menunggak";
       case "expenses": return "Kelola pengeluaran operasional kost";
       case "financial": return "Analisis keuangan dan laporan laba rugi";
       default: return "Lengkapi form di bawah untuk membuat kwitansi pembayaran";
@@ -94,6 +97,14 @@ const Index = () => {
             >
               <FileText className="h-4 w-4" />
               Laporan
+            </Button>
+            <Button
+              variant={currentView === "arrears" ? "default" : "ghost"}
+              onClick={() => setCurrentView("arrears")}
+              className="flex items-center gap-2"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Tunggakan
             </Button>
             <Button
               variant={currentView === "expenses" ? "default" : "ghost"}
@@ -154,6 +165,8 @@ const Index = () => {
 
         {currentView === "reports" && <MonthlyReport />}
 
+        {currentView === "arrears" && <TenantsArrearsReport />}
+
         {currentView === "expenses" && <ExpenseManager />}
 
         {currentView === "financial" && <FinancialReport />}
@@ -171,7 +184,7 @@ const Index = () => {
               <p>JL. Drs HASAN KADIR desa BUTU kec TILONGKABILA</p>
               <p>BONEBOLANGO GORONTALO</p>
               <p>Telp: 0821 8753 5727 | WhatsApp: 0821 8753 5727</p>
-              <p>Email: info@antieqwisma.com</p>
+              <p>Email: info@antieqwisma.com | TikTok: @antieqmediatv</p>
             </div>
             <div className="text-xs opacity-75 pt-4 border-t border-primary-light">
               <p>&copy; 2024 ANTIEQ WISMA KOST. Sistem Manajemen Pembayaran Sewa Kamar.</p>

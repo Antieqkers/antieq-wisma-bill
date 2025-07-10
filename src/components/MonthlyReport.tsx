@@ -5,12 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Download, Calendar, Edit, Trash2, Printer } from "lucide-react";
+import { FileText, Download, Calendar, Edit, Trash2, MessageCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Payment, Tenant } from "@/lib/supabaseTypes";
 import { formatCurrency } from "@/lib/paymentCalculator";
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface PaymentWithTenant extends Payment {
   tenants: Tenant;
@@ -58,6 +60,86 @@ export default function MonthlyReport() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const generatePDF = () => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(16);
+    doc.text('LAPORAN PEMBAYARAN BULANAN', 105, 20, { align: 'center' });
+    doc.setFontSize(12);
+    doc.text('ANTIEQ WISMA KOST', 105, 30, { align: 'center' });
+    doc.text(`Periode: ${selectedMonth}/${selectedYear}`, 105, 40, { align: 'center' });
+
+    // Summary
+    const summary = calculateSummary();
+    doc.text(`Total Transaksi: ${summary.totalTransactions}`, 20, 55);
+    doc.text(`Total Pembayaran: ${formatCurrency(summary.totalPayments)}`, 20, 65);
+    doc.text(`Total Tunggakan: ${formatCurrency(summary.totalOutstanding)}`, 20, 75);
+    doc.text(`Total Diskon: ${formatCurrency(summary.totalDiscount)}`, 20, 85);
+
+    // Table data
+    const tableData = payments.map(payment => [
+      formatDate(payment.payment_date),
+      payment.receipt_number,
+      payment.tenants.name,
+      payment.tenants.room_number,
+      `${payment.period_month}/${payment.period_year}`,
+      formatCurrency(payment.payment_amount),
+      payment.payment_status === 'lunas' ? 'Lunas' : 
+      payment.payment_status === 'kurang_bayar' ? 'Kurang Bayar' : 'Lebih Bayar',
+      payment.payment_method === 'cash' ? 'Tunai' : 
+      payment.payment_method === 'transfer' ? 'Transfer' : 'E-Wallet'
+    ]);
+
+    // Add table
+    (doc as any).autoTable({
+      head: [['Tanggal', 'No. Kwitansi', 'Nama', 'Kamar', 'Periode', 'Dibayar', 'Status', 'Metode']],
+      body: tableData,
+      startY: 95,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    doc.save(`laporan-pembayaran-${selectedMonth}-${selectedYear}.pdf`);
+  };
+
+  const exportToExcel = () => {
+    const csvContent = [
+      // Header
+      ['Tanggal', 'No. Kwitansi', 'Nama', 'Kamar', 'Bulan', 'Tahun', 'Tarif Sewa', 'Tunggakan', 'Diskon', 'Dibayar', 'Sisa', 'Status', 'Metode'].join(','),
+      // Data
+      ...payments.map(payment => [
+        formatDate(payment.payment_date),
+        payment.receipt_number,
+        payment.tenants.name,
+        payment.tenants.room_number,
+        payment.period_month,
+        payment.period_year,
+        payment.rent_amount,
+        payment.previous_balance,
+        payment.discount_amount,
+        payment.payment_amount,
+        payment.remaining_balance,
+        payment.payment_status,
+        payment.payment_method
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `laporan-${selectedMonth}-${selectedYear}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const sendWhatsAppConfirmation = (payment: PaymentWithTenant) => {
+    const message = `Halo ${payment.tenants.name}, pembayaran sewa kamar ${payment.tenants.room_number} untuk periode ${payment.period_month}/${payment.period_year} sebesar ${formatCurrency(payment.payment_amount)} telah kami terima. Kwitansi: ${payment.receipt_number}. Terima kasih - ANTIEQ WISMA KOST`;
+    const whatsappUrl = `https://wa.me/${payment.tenants.phone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   const handleEditPayment = (payment: PaymentWithTenant) => {
@@ -192,37 +274,6 @@ export default function MonthlyReport() {
     }
   };
 
-  const exportToCSV = () => {
-    const csvContent = [
-      // Header
-      ['Tanggal', 'No. Kwitansi', 'Nama', 'Kamar', 'Bulan', 'Tahun', 'Tarif Sewa', 'Tunggakan', 'Diskon', 'Dibayar', 'Sisa', 'Status', 'Metode'].join(','),
-      // Data
-      ...payments.map(payment => [
-        formatDate(payment.payment_date),
-        payment.receipt_number,
-        payment.tenants.name,
-        payment.tenants.room_number,
-        payment.period_month,
-        payment.period_year,
-        payment.rent_amount,
-        payment.previous_balance,
-        payment.discount_amount,
-        payment.payment_amount,
-        payment.remaining_balance,
-        payment.payment_status,
-        payment.payment_method
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `laporan-${selectedMonth}-${selectedYear}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const summary = calculateSummary();
 
   return (
@@ -232,10 +283,16 @@ export default function MonthlyReport() {
           <FileText className="h-6 w-6" />
           Laporan Bulanan
         </h2>
-        <Button onClick={exportToCSV} variant="outline" className="flex items-center gap-2">
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={generatePDF} className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Cetak PDF
+          </Button>
+          <Button onClick={exportToExcel} variant="outline" className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            Export Excel
+          </Button>
+        </div>
       </div>
 
       {/* Filter Controls */}
@@ -337,12 +394,13 @@ export default function MonthlyReport() {
                        payment.payment_method === 'transfer' ? 'Transfer' : 'E-Wallet'}
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditPayment(payment)}
                           className="h-8 w-8 p-0"
+                          title="Edit"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -351,16 +409,19 @@ export default function MonthlyReport() {
                           size="sm"
                           onClick={() => handleDeletePayment(payment.id)}
                           className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                          title="Hapus"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handlePrintReceipt(payment)}
-                          className="h-8 w-8 p-0"
+                          onClick={() => sendWhatsAppConfirmation(payment)}
+                          disabled={!payment.tenants.phone}
+                          className="h-8 w-8 p-0 text-green-600"
+                          title="Konfirmasi WhatsApp"
                         >
-                          <Printer className="h-4 w-4" />
+                          <MessageCircle className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
