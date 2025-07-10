@@ -155,7 +155,7 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
                 </div>
                 <div className="space-y-0.5">
                   <p><strong>Instagram:</strong> @antieqwisma_kost</p>
-                  <p><strong>Facebook:</strong> @Antieq Wisma Kost</p>
+                  <p><strong>TikTok:</strong> @antieqmediatv</p>
                 </div>
               </div>
             </div>
@@ -196,12 +196,12 @@ export default function Receipt({ paymentData, paymentResult, onBack }: ReceiptP
             </div>
           </div>
 
-          {/* Watermark positioned between Nama Penyewa and Status */}
+          {/* Watermark positioned between Nama Penyewa and Status - Made larger and more visible */}
           <div className="relative mb-3">
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-              <div className="text-2xl font-bold text-stone-300 transform rotate-12 tracking-wider text-center opacity-30">
+              <div className="text-4xl font-bold text-stone-400 transform rotate-12 tracking-wider text-center opacity-50">
                 ANTIEQ WISMA<br />
-                <span className="text-sm">MANAJEMEN</span>
+                <span className="text-xl">MANAJEMEN</span>
               </div>
             </div>
             
