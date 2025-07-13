@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { Building2, Users, CreditCard, FileText, BarChart3, AlertTriangle } from "lucide-react";
+import { Building2, Users, CreditCard, FileText, BarChart3, AlertTriangle, MessageCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PaymentForm from "@/components/PaymentForm";
 import ReceiptComponent from "@/components/Receipt";
@@ -12,7 +11,7 @@ import FinancialReport from "@/components/FinancialReport";
 import { PaymentFormData } from "@/lib/supabaseTypes";
 import { PaymentResult } from "@/lib/paymentCalculator";
 
-type ViewType = "form" | "receipt" | "tenants" | "reports" | "arrears" | "expenses" | "financial";
+type ViewType = "form" | "receipt" | "tenants" | "reports" | "arrears" | "expenses" | "financial" | "whatsapp" | "whatsapp-bulk";
 
 const Index = () => {
   const [currentView, setCurrentView] = useState<ViewType>("form");
@@ -38,6 +37,8 @@ const Index = () => {
       case "arrears": return "Laporan Tunggakan";
       case "expenses": return "Manajemen Pengeluaran";
       case "financial": return "Laporan Keuangan";
+      case "whatsapp": return "Otomatisasi WhatsApp";
+      case "whatsapp-bulk": return "Kirim WhatsApp Massal";
       default: return "Input Pembayaran Sewa Kamar";
     }
   };
@@ -51,6 +52,8 @@ const Index = () => {
       case "arrears": return "Laporan penghuni yang belum membayar atau menunggak";
       case "expenses": return "Kelola pengeluaran operasional kost";
       case "financial": return "Analisis keuangan dan laporan laba rugi";
+      case "whatsapp": return "Atur otomatisasi pesan WhatsApp untuk konfirmasi dan pengingat";
+      case "whatsapp-bulk": return "Kirim pesan WhatsApp ke multiple penghuni sekaligus";
       default: return "Lengkapi form di bawah untuk membuat kwitansi pembayaran";
     }
   };
@@ -122,6 +125,22 @@ const Index = () => {
               <BarChart3 className="h-4 w-4" />
               Keuangan
             </Button>
+            <Button
+              variant={currentView === "whatsapp" ? "default" : "ghost"}
+              onClick={() => setCurrentView("whatsapp")}
+              className="flex items-center gap-2"
+            >
+              <MessageCircle className="h-4 w-4" />
+              WhatsApp
+            </Button>
+            <Button
+              variant={currentView === "whatsapp-bulk" ? "default" : "ghost"}
+              onClick={() => setCurrentView("whatsapp-bulk")}
+              className="flex items-center gap-2"
+            >
+              <Send className="h-4 w-4" />
+              Kirim Massal
+            </Button>
           </div>
         </div>
       </nav>
@@ -170,6 +189,10 @@ const Index = () => {
         {currentView === "expenses" && <ExpenseManager />}
 
         {currentView === "financial" && <FinancialReport />}
+
+        {currentView === "whatsapp" && <WhatsAppAutomation />}
+
+        {currentView === "whatsapp-bulk" && <WhatsAppBulkSender />}
       </main>
 
       {/* Footer */}
