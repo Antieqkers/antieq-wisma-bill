@@ -2,48 +2,30 @@
 import { supabase } from "@/integrations/supabase/client";
 import { PaymentFormData, Tenant } from "@/lib/supabaseTypes";
 import { PaymentResult } from "@/lib/paymentCalculator";
-import { getMonthNumber } from "../PaymentFormData";
 
 export const submitPayment = async (
   formData: PaymentFormData,
   calculationResult: PaymentResult,
   selectedTenant: Tenant,
   description: string
-): Promise<any> => {
-  console.log('Submitting payment data:', formData);
-  console.log('Calculation result:', calculationResult);
-
-  // Prepare notes with transfer details if payment method is transfer
-  let notesText = description && description.trim() ? description.trim() : `Pembayaran sewa bulan ${formData.month} ${formData.year}`;
-  
-  if (formData.paymentMethod === 'transfer' && (formData.transferReference || formData.bankName)) {
-    const transferDetails = [];
-    if (formData.bankName) transferDetails.push(`Bank: ${formData.bankName}`);
-    if (formData.transferReference) transferDetails.push(`Ref: ${formData.transferReference}`);
-    
-    if (transferDetails.length > 0) {
-      notesText += ` | ${transferDetails.join(' | ')}`;
-    }
-  }
-
-  // Prepare payment data according to database schema
+) => {
   const paymentData = {
-    tenant_id: selectedTenant.id,
-    receipt_number: calculationResult.receiptNumber,
+    tenant_id: formData.tenant_id,
     payment_date: new Date().toISOString().split('T')[0],
-    period_month: getMonthNumber(formData.month),
+    period_month: new Date().getMonth() + 1,
     period_year: formData.year,
     rent_amount: formData.rentAmount,
-    previous_balance: formData.previousBalance,
+    previous_balance: formData.previousBalance || 0,
     payment_amount: formData.paymentAmount,
     discount_amount: formData.discountAmount || 0,
     remaining_balance: calculationResult.remainingBalance,
-    payment_status: calculationResult.paymentStatus,
-    payment_method: formData.paymentMethod,
-    notes: notesText
+    payment_status: calculationResult.paymentStatus as "lunas" | "kurang_bayar" | "lebih_bayar",
+    payment_method: formData.paymentMethod as "cash" | "transfer" | "ewallet",
+    receipt_number: calculationResult.receiptNumber,
+    notes: description || null
   };
 
-  console.log('Inserting payment data:', paymentData);
+  console.log('Submitting payment data:', paymentData);
 
   // Insert payment to database
   const { data: insertedData, error: insertError } = await supabase
@@ -53,29 +35,25 @@ export const submitPayment = async (
     .single();
 
   if (insertError) {
-    console.error('Error inserting payment:', insertError);
+    console.error('Insert error:', insertError);
     throw insertError;
   }
 
-  console.log('Payment inserted successfully:', insertedData);
+  console.log('Payment saved successfully:', insertedData);
   return insertedData;
 };
 
-export const updateTenantBalance = async (tenantId: string): Promise<void> => {
-  try {
-    const { error: updateError } = await supabase
-      .rpc('update_tenant_balance', {
-        p_tenant_id: tenantId
-      });
+export const updateTenantBalance = async (tenantId: string) => {
+  console.log('Updating tenant balance for:', tenantId);
+  
+  const { error } = await supabase.rpc('update_tenant_balance', {
+    p_tenant_id: tenantId
+  });
 
-    if (updateError) {
-      console.error('Error updating tenant balance:', updateError);
-      throw updateError;
-    } else {
-      console.log('Tenant balance updated successfully');
-    }
-  } catch (balanceError) {
-    console.error('Balance update error:', balanceError);
-    throw balanceError;
+  if (error) {
+    console.error('Error updating tenant balance:', error);
+    throw error;
   }
+
+  console.log('Tenant balance updated successfully');
 };

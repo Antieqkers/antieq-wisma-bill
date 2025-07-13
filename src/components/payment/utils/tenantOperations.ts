@@ -4,7 +4,6 @@ import { Tenant } from "@/lib/supabaseTypes";
 
 export const fetchTenants = async (): Promise<Tenant[]> => {
   try {
-    console.log('Fetching tenants...');
     const { data, error } = await supabase
       .from('tenants')
       .select('*')
@@ -15,7 +14,6 @@ export const fetchTenants = async (): Promise<Tenant[]> => {
       throw error;
     }
     
-    console.log('Fetched tenants:', data);
     return data || [];
   } catch (error) {
     console.error('Error fetching tenants:', error);
