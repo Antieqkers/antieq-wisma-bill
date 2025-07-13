@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, User, Building, Calendar } from "lucide-react";
+import { Plus, Edit, Trash2, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Tenant } from "@/lib/supabaseTypes";
@@ -69,7 +69,7 @@ export default function TenantManagement() {
       } else {
         const { error } = await supabase
           .from('tenants')
-          .insert([formData]);
+          .insert(formData);
         
         if (error) throw error;
         toast({
@@ -260,7 +260,7 @@ export default function TenantManagement() {
                   <TableCell>{new Date(tenant.checkin_date).toLocaleDateString('id-ID')}</TableCell>
                   <TableCell>Rp {tenant.monthly_rent.toLocaleString('id-ID')}</TableCell>
                   <TableCell>
-                    <Badge className="bg-success text-success-foreground">Aktif</Badge>
+                    <Badge className="bg-green-500 text-white">Aktif</Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">

@@ -48,7 +48,7 @@ export const submitPayment = async (
   // Insert payment to database
   const { data: insertedData, error: insertError } = await supabase
     .from('payments')
-    .insert([paymentData])
+    .insert(paymentData)
     .select()
     .single();
 
