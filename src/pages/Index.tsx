@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Building2, Users, CreditCard, FileText, BarChart3, AlertTriangle, MessageCircle, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,8 @@ import MonthlyReport from "@/components/MonthlyReport";
 import TenantsArrearsReport from "@/components/reports/TenantsArrearsReport";
 import ExpenseManager from "@/components/ExpenseManager";
 import FinancialReport from "@/components/FinancialReport";
+import WhatsAppAutomation from "@/components/whatsapp/WhatsAppAutomation";
+import WhatsAppBulkSender from "@/components/whatsapp/WhatsAppBulkSender";
 import { PaymentFormData } from "@/lib/supabaseTypes";
 import { PaymentResult } from "@/lib/paymentCalculator";
 

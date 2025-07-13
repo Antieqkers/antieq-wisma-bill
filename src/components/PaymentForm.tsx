@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -79,7 +80,7 @@ const PaymentForm = ({ onPaymentSubmit }: PaymentFormProps) => {
               <Label htmlFor="month">Bulan</Label>
               <Select onValueChange={(value) => handleInputChange('month', value)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Pilih bulan..." value={formData.month.toString()} />
+                  <SelectValue placeholder="Pilih bulan..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Januari">Januari</SelectItem>
@@ -158,7 +159,7 @@ const PaymentForm = ({ onPaymentSubmit }: PaymentFormProps) => {
             <Label htmlFor="paymentMethod">Metode Pembayaran</Label>
             <Select onValueChange={(value) => handleInputChange('paymentMethod', value)}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Pilih metode pembayaran..." value={formData.paymentMethod} />
+                <SelectValue placeholder="Pilih metode pembayaran..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="cash">Tunai</SelectItem>
