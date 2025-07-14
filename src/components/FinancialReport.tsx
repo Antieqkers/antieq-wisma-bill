@@ -52,7 +52,7 @@ export default function FinancialReport() {
         .order('payment_date', { ascending: false });
 
       if (paymentsError) throw paymentsError;
-      setPayments(paymentsData || []);
+      setPayments((paymentsData && Array.isArray(paymentsData)) ? paymentsData : []);
 
       // Fetch expenses from localStorage
       const savedExpenses = localStorage.getItem('expenses');

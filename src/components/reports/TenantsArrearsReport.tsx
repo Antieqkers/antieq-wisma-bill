@@ -61,7 +61,7 @@ export default function TenantsArrearsReport() {
       const arrearsData: TenantArrears[] = [];
       const targetDate = new Date(selectedDate);
 
-      tenants?.forEach(tenant => {
+      (tenants && Array.isArray(tenants) ? tenants : []).forEach(tenant => {
         const checkinDate = new Date(tenant.checkin_date);
         const monthsPassed = Math.max(0, 
           (targetDate.getFullYear() - checkinDate.getFullYear()) * 12 + 
@@ -70,7 +70,7 @@ export default function TenantsArrearsReport() {
 
         if (monthsPassed > 0) {
           const totalShouldPaid = tenant.monthly_rent * monthsPassed;
-          const tenantPayments = payments?.filter(p => p.tenant_id === tenant.id) || [];
+          const tenantPayments = (payments && Array.isArray(payments)) ? payments.filter(p => p.tenant_id === tenant.id) : [];
           const totalPaid = tenantPayments.reduce((sum, p) => sum + p.payment_amount, 0);
           const arrears = totalShouldPaid - totalPaid;
 

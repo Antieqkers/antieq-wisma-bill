@@ -53,7 +53,7 @@ export default function WhatsAppBulkSender() {
       const tenantsWithArrears: TenantWithArrears[] = [];
       const currentDate = new Date();
 
-      tenantsData?.forEach(tenant => {
+      (tenantsData && Array.isArray(tenantsData) ? tenantsData : []).forEach(tenant => {
         const checkinDate = new Date(tenant.checkin_date);
         const monthsPassed = Math.max(0, 
           (currentDate.getFullYear() - checkinDate.getFullYear()) * 12 + 
@@ -62,7 +62,7 @@ export default function WhatsAppBulkSender() {
 
         if (monthsPassed > 0) {
           const totalShouldPaid = tenant.monthly_rent * monthsPassed;
-          const tenantPayments = payments?.filter(p => p.tenant_id === tenant.id) || [];
+          const tenantPayments = (payments && Array.isArray(payments)) ? payments.filter(p => p.tenant_id === tenant.id) : [];
           const totalPaid = tenantPayments.reduce((sum, p) => sum + p.payment_amount, 0);
           const arrears = totalShouldPaid - totalPaid;
 

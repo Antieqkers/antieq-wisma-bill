@@ -58,7 +58,7 @@ export const calculateOutstandingBalance = async (selectedTenant: Tenant): Promi
     console.log('Payments found:', payments);
 
     let totalPaid = 0;
-    if (payments && payments.length > 0) {
+    if (payments && Array.isArray(payments) && payments.length > 0) {
       // Sum all payments made
       totalPaid = payments.reduce((sum, payment) => {
         console.log('Payment amount:', payment.payment_amount);
@@ -127,7 +127,7 @@ export const calculateManualBalance = async (selectedTenant: Tenant): Promise<nu
       throw paymentsError;
     }
 
-    const totalPaid = payments?.reduce((sum, payment) => sum + (payment.payment_amount || 0), 0) || 0;
+    const totalPaid = (payments && Array.isArray(payments)) ? payments.reduce((sum, payment) => sum + (payment.payment_amount || 0), 0) : 0;
     const outstanding = Math.max(totalShouldPay - totalPaid, 0);
     
     console.log('Manual calculation - Total paid:', totalPaid, 'Outstanding up to current month:', outstanding);
